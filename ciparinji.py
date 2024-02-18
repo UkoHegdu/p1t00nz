@@ -1,5 +1,5 @@
 import pygame
-import random
+import copy
 
 # Initialize Pygame
 pygame.init()
@@ -25,6 +25,9 @@ GRID_WIDTH = 40
 GRID_HEIGHT = 40
 GRID_MARGIN = 0 #principaa tas grid margin taalaak kodaa nav vajadziigs lmao
 
+#difficulty
+difficulty_level = "easy"
+
 # Define the initial grid
 original_grid = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -38,13 +41,16 @@ adjacency_grid = [
     [5, 1, 6, 1, 7, 1, 8, 1, 9]
 ]
 
+kopija = copy.deepcopy(original_grid)
+
 class Button:
-    def __init__(self, text, position, action):
+    def __init__(self, text, position, action, button_type="ok", color=(0, 128, 255), size=(90, 30)):
         self.text = text
         self.position = position
         self.action = action
         self.font = pygame.font.Font(None, 24)
         self.rect = pygame.Rect(self.position[0], self.position[1], 90, 30)
+        self.button_type = button_type
 
     def draw(self, screen):
         pygame.draw.rect(screen, WHITE, self.rect)
@@ -58,7 +64,11 @@ class Button:
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
-                self.action()
+                if self.button_type in ["yes", "no"]:
+                    return self.button_type
+                else:
+                    self.action()
+
 
 # Define variables to keep track of selected cells
 selected_cells = []
@@ -101,7 +111,7 @@ def draw_grid(original_grid, adjacency_grid):
 
 
 
-def handle_mouse_events(original_grid, adjacency_grid, button): #I think this function might handle mouse events
+def handle_mouse_events(original_grid, adjacency_grid, buttons, button_actions): #I think this function might handle mouse events
     global selected_cells
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -115,8 +125,15 @@ def handle_mouse_events(original_grid, adjacency_grid, button): #I think this fu
                 row = (y - GRID_MARGIN) // (GRID_HEIGHT + GRID_MARGIN)
                 print("Clicked row:", row)  # Print clicked row to console
                # print ("num rows", NUM_ROWS, " un num cols", NUM_COLS)
-                if button.rect.collidepoint(event.pos):  # Check if mouse click is inside the button
-                    button.action()  # Call button action if button is clicked
+                for button, action in button_actions.items():
+                   if button.rect.collidepoint(event.pos):  # Check if mouse click is inside the button
+                     print("Button clicked!")
+                     button_type = button.handle_event(event)
+                     if button_type == "yes":
+                            return "yes"
+                     elif button_type == "no":
+                            return "no"
+                     action()    # Call button action if button is clicked
 
                 if col > NUM_COLS-1 or row > len(adjacency_grid) - 1: #handle situation if you click outside the numbers
                     print("out of boundz")
@@ -125,7 +142,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button): #I think this fu
                 
                 if adjacency_grid[row][col] == 0: # check that you don't pick an already erased number
                     print("iekaapu sviestaa pirms tam")
-                    display_dialog(window, "Number already removed!")
+                    display_dialog(window, "Number already removed!", type="ok")
                     selected_cells = []
                 
                 elif 0 <= row < len(original_grid) and 0 <= col < NUM_COLS:
@@ -152,7 +169,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button): #I think this fu
                             selected_cells = []
                             if all(element == 0 for element in adjacency_grid):
                                 print("Wow, you finished!")
-                                display_dialog(window, "Congratulations!")
+                                display_dialog(window, "Congratulations!", type="ok")
 
                         else:
                             selected_cells = []
@@ -168,12 +185,12 @@ def matching(adjacency_grid, selected_cells): #laiks sapārot ciparus
            return True
          else:
              print("Numbers are not adjacent!")
-             display_dialog(window, "Numbers are not adjacent!")
+             display_dialog(window, "Numbers are not adjacent!", type="ok")
              selected_cells = []
      
     else:
         print("Numbers do not match!")
-        display_dialog(window, "Numbers do not match!")
+        display_dialog(window, "Numbers do not match!", type="ok")
         selected_cells = []
     
 
@@ -220,6 +237,7 @@ def is_adjacent (adjacency_grid, row1, col1, row2, col2): #mēģinām izpīpēt 
             return False       
 
 def redraw_board(original_grid, adjacency_grid): #add the numbers that are not 0s
+    
     append_list=[]
     for i, row in enumerate(adjacency_grid):
          for j, element in enumerate(row):
@@ -241,7 +259,10 @@ def redraw_board(original_grid, adjacency_grid): #add the numbers that are not 0
         original_grid[i].append(element)
         j=j+1
 
-def display_dialog(window, message): # koda klucis logam
+def hint_match(adjacency_grid):
+    return False
+
+def display_dialog(window, message, type="ok"): # koda klucis logam
     # Create a window surface
     dialog_surface = pygame.Surface((400, 200))
     dialog_surface.fill(LIGHT_BLUE)  # Fill the window surface with a color
@@ -249,19 +270,27 @@ def display_dialog(window, message): # koda klucis logam
     font = pygame.font.Font(None, 36)
     text = font.render(message, True, BLACK)
     text_rect = text.get_rect(center=(200, 80))
+    if type == "ok":
+        #ok_button = BeautifulButton
+        button_surface = pygame.Surface((200, 50))
+        button_surface.fill(BLUE)
+        button_rect = button_surface.get_rect(center=(200, 150))
+        # Render text on the button
+        button_text = font.render("OK", True, WHITE)
+        button_text_rect = button_text.get_rect(center=button_rect.center)
+        dialog_surface.blit(text, text_rect)
+        dialog_surface.blit(button_surface, button_rect)
+        dialog_surface.blit(button_text, button_text_rect)  # Blit text onto the button
+    elif type == "yes_no":
+                # Render "Yes" button
+        yes_button = Button("Yes", (150, 150), action=lambda: None, button_type="yes")
+        no_button = Button("No", (250, 150), action=lambda: None, button_type="no")
 
-    button_surface = pygame.Surface((200, 50))
-    button_surface.fill(BLUE)
-    button_rect = button_surface.get_rect(center=(200, 150))
+        dialog_surface.blit(text, text_rect)
+        yes_button.draw(dialog_surface)
+        no_button.draw(dialog_surface)
 
-    # Render text on the button
-    button_text = font.render("OK", True, WHITE)
-    button_text_rect = button_text.get_rect(center=button_rect.center)
-
-    dialog_surface.blit(text, text_rect)
-    dialog_surface.blit(button_surface, button_rect)
-    dialog_surface.blit(button_text, button_text_rect)  # Blit text onto the button
-
+    
     # Get the rect for the dialog surface and center it on the game window
     dialog_rect = dialog_surface.get_rect(center=window.get_rect().center)
 
@@ -284,23 +313,82 @@ def main():
     # Create initial grid
     grid = original_grid
     clock = pygame.time.Clock()
+  
+    def redrawbutton_action():
+        print("redraw Button clicked!")
+        if difficulty_level == "hard":
+             if hint_match(adjacency_grid) == False:
+                 redraw_board(original_grid, adjacency_grid)
+             else:
+                 display_dialog(window, "More matches possible!", type="ok")
+        elif difficulty_level == "easy":
+             redraw_board(original_grid, adjacency_grid)
 
-    def button_action():
-        print("Button clicked!")
-        redraw_board(original_grid, adjacency_grid)
+    def newbutton_action():
+        print("new game")
+        choice=display_dialog(window, "New game? Sure?", type="yes_no")
+        if choice == "yes":
+          original_grid = kopija
+          adjacency_grid = kopija
+        elif choice == "no":
+          print("pressed no")    
 
-    button = Button("Redraw", (WINDOW_WIDTH - 120, 40), button_action)
-    
+    def easybutton_action():
+        print("easy Button clicked!")
+        global difficulty_level
+        difficulty_level = "easy"
+    def defbutton_action():
+        print("defButton clicked!")
+        global difficulty_level
+        difficulty_level = "hard"
+
+    def erasebutton_action():
+        print("erase Button clicked!")
+        rows_to_delete = []  # Store the indices of rows to delete
+        for index, row in enumerate(adjacency_grid):
+           if all(col == 0 for col in row):
+             rows_to_delete.append(index)
+    # Delete rows from adjacency_grid and original_grid
+        for index in reversed(rows_to_delete):
+           del adjacency_grid[index]
+           del original_grid[index]
+
+    redrawbutton = Button("Redraw", (WINDOW_WIDTH - 120, 40), redrawbutton_action)
+    easybutton = Button("Easy", (WINDOW_WIDTH - 120, 180), easybutton_action)
+    defbutton = Button("Difficult", (WINDOW_WIDTH - 120, 220), defbutton_action)
+    erasebutton = Button("Del empty", (WINDOW_WIDTH - 120, 260), erasebutton_action)
+    newbutton = Button("New game", (WINDOW_WIDTH - 120, 300), newbutton_action)
+
+    # Create font object for permanent text (difficulty level)
+    font = pygame.font.Font(None, 24)  # You can change the font and size here
+
+    # Store button-action pairs in a dictionary
+    button_actions = {
+        redrawbutton: redrawbutton_action,
+        easybutton: easybutton_action,
+        defbutton: defbutton_action,
+        erasebutton: erasebutton_action,
+        newbutton: newbutton_action
+    }
+    buttons = [redrawbutton, easybutton, defbutton, erasebutton]
     running = True
+
     while running:
         # Handle events
-        handle_mouse_events(grid, adjacency_grid, button)
+        handle_mouse_events(grid, adjacency_grid, buttons, button_actions)
 
         # Draw everything
         window.fill(WHITE)
         draw_grid(grid, adjacency_grid)
-        button.draw(window)
-        
+        easybutton.draw(window)
+        redrawbutton.draw(window)
+        defbutton.draw(window)
+        erasebutton.draw(window)
+        newbutton.draw(window)
+        # Render permanent text
+        text_content = f"Diff: {difficulty_level}"
+        difficulty_text = font.render(text_content, True, (0, 0, 0))  # Render text
+        window.blit(difficulty_text, (WINDOW_WIDTH - 120, 120))  # Blit text onto the screen
 
         pygame.display.flip()
         clock.tick(60)
