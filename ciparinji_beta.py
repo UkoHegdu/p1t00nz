@@ -10,6 +10,11 @@ WINDOW_HEIGHT = 900
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Skein")
 
+# Set window icon
+icon = pygame.image.load('skein_icon.png')
+pygame.display.set_icon(icon)
+
+
 # Define colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -154,6 +159,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
 
 def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I think this function might handle mouse events
     global selected_cells
+    global turns
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -201,9 +207,14 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                             adjacency_grid[row1][col1] = 0
                             adjacency_grid[row2][col2] = 0
                             selected_cells = []
-                            if all(element == 0 for element in adjacency_grid):
+                            print("adjacency grid", adjacency_grid)
+                            print("original grid", original_grid)
+                            if sum(element for row in adjacency_grid for element in row) == 0:
                                 print("Wow, you finished!")
-                                display_dialog(window, "Congratulations!", type="ok")
+                                display_dialog(window, "Congratulations! You finished in ", turns, " turns", type="ok")
+                                turns=0
+                                #new_game_board(original_grid, adjacency_grid)
+
 
                         else:
                             selected_cells = []
@@ -302,7 +313,7 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
 
 
 def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s
-
+    global turns
     append_list = []
     for i, row in enumerate(adjacency_grid):
         for j, element in enumerate(row):
@@ -338,8 +349,8 @@ def new_game_board(original_grid, adjacency_grid):
             adjacency_grid.clear()
             rows = [[1, 2, 3, 4, 5, 6, 7, 8, 9],[1, 1, 1, 2, 1, 3, 1, 4, 1],[5, 1, 6, 1, 7, 1, 8, 1, 9],]
             for row in rows:
-                original_grid.append(row)
-                adjacency_grid.append(row)  
+                original_grid.append(row.copy())  # Make a copy of the row otherwise modifications in adjacency grid will affect original grid as well because why the fuck not
+                adjacency_grid.append(row.copy())
             print (len(original_grid), "garums original grid")
             print (len(adjacency_grid), "garums adjacency grid")
             #draw_grid(grid, adjacency_grid)
@@ -542,16 +553,23 @@ def main():
     grid = original_grid
     clock = pygame.time.Clock()
     global start_time
+    global turns
+    turns=0
             
     def redrawbutton_action():
+        global turns
         #print("redraw Button clicked with difficulty", difficulty_level)
         if difficulty_level == "hard":
             if hint_find(adjacency_grid) == False:
                 redraw_board(original_grid, adjacency_grid)
+                turns=turns+1
+                print("turn no. ", turns)
             else:
                 display_dialog(window, "More matches possible!", type="ok")
         elif difficulty_level == "easy":
             redraw_board(original_grid, adjacency_grid)
+            turns=turns+1
+            print("turn no. ", turns)
     
     def hintbutton_action():
         global start_time
@@ -560,7 +578,7 @@ def main():
         start_time = time.time()
 
     def newbutton_action():
-        new_game_board(original_grid,adjacency_grid)
+        new_game_board(original_grid, adjacency_grid)
         print("aarpusfunkcijas original grid garums", len(original_grid))
         print(original_grid)
        
@@ -581,10 +599,13 @@ def main():
         for index, row in enumerate(adjacency_grid):
             if all(col == 0 for col in row):
                 rows_to_delete.append(index)
-        # Delete rows from adjacency_grid and original_grid
-        for index in reversed(rows_to_delete):
-            del adjacency_grid[index]
-            del original_grid[index]
+        if rows_to_delete == []:
+           display_dialog(window, "There are no empty rows!", type="ok")
+        else:
+          # Delete rows from adjacency_grid and original_grid
+          for index in reversed(rows_to_delete):
+              del adjacency_grid[index]
+              del original_grid[index]
 
     redrawbutton = Button("Redraw", (WINDOW_WIDTH - 120, 40), redrawbutton_action)
     easybutton = Button("Easy", (WINDOW_WIDTH - 120, 180), easybutton_action)
@@ -610,8 +631,8 @@ def main():
     while running:
         elapsed_time = time.time() - start_time
         # Handle events
+        
         handle_mouse_events(grid, adjacency_grid, button_actions)
-
         # Draw everything
         window.fill(WHITE)
         draw_grid(grid, adjacency_grid, elapsed_time)
