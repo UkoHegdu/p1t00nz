@@ -1,60 +1,61 @@
 import pygame
-import sys
 
-# Define colors
-WHITE = (255, 255, 255)
+# Initialize Pygame
+pygame.init()
+
+# Constants
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 300
+CELL_SIZE = 30
+GRID_WIDTH = 9
+GRID_HEIGHT = 9
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
-class Button:
-    def __init__(self, text, position, action):
-        self.text = text
-        self.position = position
-        self.action = action
-        self.font = pygame.font.Font(None, 36)
-        self.rect = pygame.Rect(self.position[0], self.position[1], 200, 50)
+# Create the screen
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Grid with Numbers")
 
-    def draw(self, screen):
-        pygame.draw.rect(screen, WHITE, self.rect)
-        pygame.draw.rect(screen, BLACK, self.rect, 2)
-        text_surface = self.font.render(self.text, True, BLACK)
-        text_rect = text_surface.get_rect(center=self.rect.center)
-        screen.blit(text_surface, text_rect)
+# 2D Array
+grid = [
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [2, 2, 3, 4, 5, 6, 7, 8, 9]
+]
 
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(event.pos):
-                self.action()
 
-def main():
-    pygame.init()
-    screen_width = 800
-    screen_height = 600
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption("Pygame Button Example")
+# Function to draw the grid
+def draw_grid():
+    print("GRID_HEIGHT:", GRID_HEIGHT)
+    print("len(grid):", len(grid))
+    for y in range(min(GRID_HEIGHT, len(grid)+1)):
+        print("y:", y)
+        for x in range(GRID_WIDTH):
+            rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            pygame.draw.rect(screen, WHITE, rect, 1)
+            if y >= 1:  # Fill squares from the 2nd row
+                font = pygame.font.SysFont(None, 24)
+                if x < len(grid[y]):  # Check if x is within the bounds of the row
+                    number_text = font.render(str(grid[y-1][x]), True, BLACK)
+                    screen.blit(number_text, rect.topleft)
+                else:
+                    print("x out of range:", x)
+        print()  # Add a newline for clarity
 
-    clock = pygame.time.Clock()
+# Main loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
-    # Define button action
-    def button_action():
-        print("Button clicked!")
+    # Clear the screen
+    screen.fill(WHITE)
 
-    # Create button
-    button = Button("Click me", (screen_width - 250, 50), button_action)
+    # Draw the grid
+    draw_grid()
 
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            button.handle_event(event)
+    # Update the display
+    pygame.display.flip()
 
-        screen.fill(WHITE)
-        button.draw(screen)
-        pygame.display.flip()
-        clock.tick(60)
-
-    pygame.quit()
-    sys.exit()
-
-if __name__ == "__main__":
-    main()
+# Quit Pygame
+pygame.quit()

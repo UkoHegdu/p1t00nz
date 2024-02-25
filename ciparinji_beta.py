@@ -2,11 +2,12 @@ import pygame
 import time
 
 # Initialize Pygame
+# best score so far - 20 :(((
 pygame.init()
 
 # Set up the window
 WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 900
+WINDOW_HEIGHT = 1010
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Skein")
 
@@ -23,6 +24,13 @@ RED = (219, 138, 176)
 LIGHT_BLUE = (173, 216, 230)
 DARK_BLUE = (0, 0, 139)
 LIGHT_GREEN = (144, 238, 144)
+
+#Inverted colours for dark mode
+inverted_BLUE = (117, 130, 41)
+inverted_LIGHT_BLUE = (82, 39, 25)
+inverted_DARK_BLUE = (255, 255, 116)
+inverted_LIGHT_GREEN = (111, 17, 111)
+DARK_GREY = (31, 31, 31)
 
 # Define grid parameters
 NUM_ROWS = 3
@@ -86,10 +94,6 @@ hint_cells=[]
 
 def draw_grid(original_grid, adjacency_grid, elapsed_time):
     # Draw grid cells
-    NUM_ROWS = len(original_grid)
-    #print("hintcells drawgridaa", hint_cells)
-    #print("selected cells", selected_cells)
-    #print(elapsed_time)
     for row in range(len(original_grid)):
        # print("rindinja", row, len(original_grid))
         for col in range(len(original_grid[row])):
@@ -105,40 +109,32 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
                 window,
                 cell_color,
                 [
-                    GRID_MARGIN + col * (GRID_WIDTH + GRID_MARGIN),
-                    GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN),
-                    GRID_WIDTH + GRID_MARGIN,
-                    GRID_HEIGHT + GRID_MARGIN,
+                    col * GRID_WIDTH + GRID_WIDTH, #*1* reference> for visual purposes, so that cells start on row 2, instead of 1, like you would use a notepad 
+                    row * GRID_HEIGHT + GRID_HEIGHT,
+                    GRID_WIDTH,
+                    GRID_HEIGHT,
                 ],
             )
             font = pygame.font.Font(None, 40)
             text = font.render(str(original_grid[row][col]), True, BLACK)
             text_rect = text.get_rect(
-                center=(
-                    GRID_MARGIN
-                    + col * (GRID_WIDTH + GRID_MARGIN)
-                    + (GRID_WIDTH + GRID_MARGIN) / 2,
-                    GRID_MARGIN
-                    + row * (GRID_HEIGHT + GRID_MARGIN)
-                    + (GRID_HEIGHT + GRID_MARGIN) / 2,
-                )
-            )  # Adjusted to center
+                #center=(col * GRID_WIDTH + (GRID_WIDTH) / 2, row * (GRID_HEIGHT) + (GRID_HEIGHT) / 2))  # Adjusted to center
+                center=( col * GRID_WIDTH + GRID_WIDTH / 2 + GRID_WIDTH, row * GRID_HEIGHT + GRID_HEIGHT / 2 + GRID_HEIGHT))  # Adjusted to center & see *1* reference
             window.blit(text, text_rect)
 
     # Draw horizontal lines
-    for row in range(WINDOW_HEIGHT // GRID_HEIGHT):
+    for row in range(WINDOW_HEIGHT // GRID_HEIGHT + 1):
         pygame.draw.line(
             window,
             BLUE,
-            (GRID_MARGIN, GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN)),
-            (
+            (GRID_MARGIN, GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN)),            (
                 WINDOW_WIDTH - GRID_MARGIN,
-                GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN),
-            ),
+                GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN)),
             2,
         )
 
     # Draw vertical lines
+    
     for col in range(WINDOW_WIDTH // GRID_WIDTH):
         pygame.draw.line(
             window,
@@ -150,7 +146,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
             ),
             2,
         )
-
+    
     # Draw the red line that notebooks have
     pygame.draw.rect(
         window, RED, [WINDOW_WIDTH - 150, 0, 2, WINDOW_HEIGHT]
@@ -167,9 +163,11 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
                 x, y = event.pos
-                col = (x - GRID_MARGIN) // (GRID_WIDTH + GRID_MARGIN)
+                x=x - GRID_WIDTH #these adjustments are because of *1* reference
+                y=y -GRID_HEIGHT
+                col = x // GRID_WIDTH 
                 print("Clicked column:", col)  # Print clicked column to console
-                row = (y - GRID_MARGIN) // (GRID_HEIGHT + GRID_MARGIN)
+                row = y // GRID_HEIGHT
                 print("Clicked row:", row)  # Print clicked row to console
                 # print ("num rows", NUM_ROWS, " un num cols", NUM_COLS)
                 for button, action in button_actions.items():
@@ -186,7 +184,6 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                     selected_cells = []
 
                 elif 0 <= row < len(original_grid) and 0 <= col < NUM_COLS:
-                    # print("iekaapu sviestaa")
                     cell_pos = (row, col)
                     print("cell_pos", cell_pos)
                     if len(selected_cells) < 2:
@@ -211,9 +208,10 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                             print("original grid", original_grid)
                             if sum(element for row in adjacency_grid for element in row) == 0:
                                 print("Wow, you finished!")
-                                display_dialog(window, "Congratulations! You finished in ", turns, " turns", type="ok")
+                                message = f"Congratulations! You finished in {turns} turns"
+                                display_dialog(window, message, type="ok")
                                 turns=0
-                                #new_game_board(original_grid, adjacency_grid)
+                                new_game_board(original_grid, adjacency_grid, choice=True)
 
 
                         else:
@@ -314,6 +312,8 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
 
 def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s
     global turns
+    turns=turns+1
+    print("turn No. ", turns)
     append_list = []
     for i, row in enumerate(adjacency_grid):
         for j, element in enumerate(row):
@@ -325,24 +325,30 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
     # print (i, j)
     # print ("garums",len(adjacency_grid[i])-1)
     for element in append_list:
-        if (
-            j == 8
-        ):  # if we are looking at the last element of a row, jump to the next one
+        if (j == 8):  # if we are looking at the last element of a row, jump to the next one
             # print("esmu ifaa")
             j = -1
             i = i + 1
-            original_grid.append(
-                []
-            )  # need to add new rows otherwise the poor soul is out of range
-            adjacency_grid.append([])
+            print("i ",i)
+            print ("daliitais cipars, ", WINDOW_HEIGHT/GRID_HEIGHT)
+            if i >= WINDOW_HEIGHT/GRID_HEIGHT:
+                display_dialog(window, "Game over!", type="ok")
+                new_game_board(original_grid, adjacency_grid, choice=True)
+                return False
+            else:
+                original_grid.append([])  # need to add new rows otherwise the poor soul is out of range
+                adjacency_grid.append([])
         # print(i, j, " ifaa")
         #  print(i, j)
         adjacency_grid[i].append(element)
         original_grid[i].append(element)
+        
         j = j + 1
 
-def new_game_board(original_grid, adjacency_grid):
-     choice = display_dialog(window, "New game? Sure?", type="yes_no")
+def new_game_board(original_grid, adjacency_grid, choice):
+     global turns
+     if choice == False:
+        choice = display_dialog(window, "New game? Sure?", type="yes_no")
         #print("choice", choice)
      if choice == True:
             original_grid.clear()
@@ -353,6 +359,7 @@ def new_game_board(original_grid, adjacency_grid):
                 adjacency_grid.append(row.copy())
             print (len(original_grid), "garums original grid")
             print (len(adjacency_grid), "garums adjacency grid")
+            turns=1
             #draw_grid(grid, adjacency_grid)
             
 
@@ -554,23 +561,18 @@ def main():
     clock = pygame.time.Clock()
     global start_time
     global turns
-    turns=0
+    turns=1
             
     def redrawbutton_action():
-        global turns
         #print("redraw Button clicked with difficulty", difficulty_level)
         if difficulty_level == "hard":
             if hint_find(adjacency_grid) == False:
                 redraw_board(original_grid, adjacency_grid)
-                turns=turns+1
-                print("turn no. ", turns)
             else:
                 display_dialog(window, "More matches possible!", type="ok")
         elif difficulty_level == "easy":
             redraw_board(original_grid, adjacency_grid)
-            turns=turns+1
-            print("turn no. ", turns)
-    
+                            
     def hintbutton_action():
         global start_time
         if hint_find(adjacency_grid) == False:
@@ -578,7 +580,7 @@ def main():
         start_time = time.time()
 
     def newbutton_action():
-        new_game_board(original_grid, adjacency_grid)
+        new_game_board(original_grid, adjacency_grid, choice=False)
         print("aarpusfunkcijas original grid garums", len(original_grid))
         print(original_grid)
        
