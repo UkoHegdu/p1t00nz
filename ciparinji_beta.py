@@ -1,5 +1,6 @@
 import pygame
 import time
+import json
 
 # Initialize Pygame
 # best score so far - 20 :(((
@@ -30,7 +31,10 @@ inverted_BLUE = (117, 130, 41)
 inverted_LIGHT_BLUE = (82, 39, 25)
 inverted_DARK_BLUE = (255, 255, 116)
 inverted_LIGHT_GREEN = (111, 17, 111)
+inverted_RED = (36, 117, 79)
 DARK_GREY = (31, 31, 31)
+
+is_dark_mode = False
 
 # Define grid parameters
 NUM_ROWS = 3
@@ -72,13 +76,13 @@ class Button:
         self.rect = pygame.Rect(self.position[0], self.position[1], 90, 30)
 
     def draw(self, screen):
-        pygame.draw.rect(screen, WHITE, self.rect)
-        pygame.draw.rect(screen, BLACK, self.rect, 2)
-        text_surface = self.font.render(self.text, True, BLACK)
+        pygame.draw.rect(screen, BLACK if is_dark_mode else LIGHT_BLUE, self.rect)
+        pygame.draw.rect(screen, BLACK if is_dark_mode else LIGHT_BLUE, self.rect, 2)
+        text_surface = self.font.render(self.text, True, WHITE if is_dark_mode else BLACK)
         text_rect = text_surface.get_rect(center=self.rect.center)
         screen.blit(text_surface, text_rect)
         button_surface = pygame.Surface((90, 30))
-        button_surface.fill(BLUE)
+        button_surface.fill(inverted_BLUE if is_dark_mode else BLUE)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -98,13 +102,13 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
        # print("rindinja", row, len(original_grid))
         for col in range(len(original_grid[row])):
         #    print("kolonna", col)
-            cell_color = WHITE
+            cell_color = DARK_GREY if is_dark_mode else WHITE
             if adjacency_grid[row][col] == 0:
-                cell_color = DARK_BLUE
+                cell_color = inverted_DARK_BLUE if is_dark_mode else DARK_BLUE
             elif (row, col) in selected_cells:
-                cell_color = LIGHT_BLUE
+                cell_color = inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE
             elif (row, col) in hint_cells and elapsed_time < 3:
-                cell_color = LIGHT_GREEN   
+                cell_color = inverted_LIGHT_GREEN if is_dark_mode else LIGHT_GREEN   
             pygame.draw.rect(
                 window,
                 cell_color,
@@ -116,7 +120,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
                 ],
             )
             font = pygame.font.Font(None, 40)
-            text = font.render(str(original_grid[row][col]), True, BLACK)
+            text = font.render(str(original_grid[row][col]), True, WHITE if is_dark_mode else BLACK)
             text_rect = text.get_rect(
                 #center=(col * GRID_WIDTH + (GRID_WIDTH) / 2, row * (GRID_HEIGHT) + (GRID_HEIGHT) / 2))  # Adjusted to center
                 center=( col * GRID_WIDTH + GRID_WIDTH / 2 + GRID_WIDTH, row * GRID_HEIGHT + GRID_HEIGHT / 2 + GRID_HEIGHT))  # Adjusted to center & see *1* reference
@@ -126,7 +130,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
     for row in range(WINDOW_HEIGHT // GRID_HEIGHT + 1):
         pygame.draw.line(
             window,
-            BLUE,
+            inverted_BLUE if is_dark_mode else BLUE,
             (GRID_MARGIN, GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN)),            (
                 WINDOW_WIDTH - GRID_MARGIN,
                 GRID_MARGIN + row * (GRID_HEIGHT + GRID_MARGIN)),
@@ -138,7 +142,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
     for col in range(WINDOW_WIDTH // GRID_WIDTH):
         pygame.draw.line(
             window,
-            BLUE,
+            inverted_BLUE if is_dark_mode else BLUE,
             (GRID_MARGIN + col * (GRID_WIDTH + GRID_MARGIN), GRID_MARGIN),
             (
                 GRID_MARGIN + col * (GRID_WIDTH + GRID_MARGIN),
@@ -149,7 +153,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
     
     # Draw the red line that notebooks have
     pygame.draw.rect(
-        window, RED, [WINDOW_WIDTH - 150, 0, 2, WINDOW_HEIGHT]
+        window, inverted_RED if is_dark_mode else RED, [WINDOW_WIDTH - 150, 0, 2, WINDOW_HEIGHT]
     )  # notebook red line
 
 
@@ -206,14 +210,6 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                             selected_cells = []
                             print("adjacency grid", adjacency_grid)
                             print("original grid", original_grid)
-                            if sum(element for row in adjacency_grid for element in row) == 0:
-                                print("Wow, you finished!")
-                                message = f"Congratulations! You finished in {turns} turns"
-                                display_dialog(window, message, type="ok")
-                                turns=0
-                                new_game_board(original_grid, adjacency_grid, choice=True)
-
-
                         else:
                             selected_cells = []
 
@@ -492,11 +488,11 @@ def find_matches(adjacency_grid, i, j, hint_cells): #looking for adjacent cells 
     if found_match==False: #if there is no match found return false
        return False
                  
-def display_dialog(window, message, type="ok"):  # koda klucis logam
+def display_dialog(window, message, type="ok"):  # the informative display dialogues (and the yes/no one as well)
 
     # Render text
     font = pygame.font.Font(None, 36)
-    text = font.render(message, True, BLACK)
+    text = font.render(message, True, WHITE if is_dark_mode else BLACK)
     
     # Create rectangle for dialog area
     dialog_rect = pygame.Rect(100, 100, 400, 200)
@@ -508,17 +504,17 @@ def display_dialog(window, message, type="ok"):  # koda klucis logam
 
     if type == "ok":
 
-        pygame.draw.rect(window, LIGHT_BLUE, dialog_rect)
+        pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
         # Draw button rectangle
         button_rect = pygame.Rect(150, 100, 200, 50)
         button_rect.center = (button_center_x, button_y)
-        pygame.draw.rect(window, BLUE, button_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, button_rect)
         # Render and draw button text
-        button_text = font.render("OK", True, WHITE)
+        button_text = font.render("OK", True, BLACK if is_dark_mode else WHITE)
         button_text_rect = button_text.get_rect(center=button_rect.center)
         window.blit(button_text, button_text_rect)
     elif type == "yes_no":
-        pygame.draw.rect(window, BLUE, dialog_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect)
         # Render "Yes" button
         yes_button = Button("Yes",(150, 150),action=lambda: print("Yes button clicked"))
         yes_button.rect.center = (button_center_x - 75, button_y)
@@ -543,7 +539,9 @@ def display_dialog(window, message, type="ok"):  # koda klucis logam
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 if type == "ok" and button_rect.collidepoint(x, y):
+                  print("OK button clicked")
                   waiting = False  # Exit the loop only if the OK button is clicked
+                  return False
                 elif type == "yes_no":
                   if yes_button.rect.collidepoint(x, y):
                     print("Yes button clicked")
@@ -553,6 +551,97 @@ def display_dialog(window, message, type="ok"):  # koda klucis logam
                     print("No button clicked")
                     waiting = False  # Exit the loop if the No button is clicked
                     return False
+
+def save_score(score):
+    try:
+        # Load existing scores from the file
+        with open('scores.json', 'r') as f:
+            scores = json.load(f)
+    except FileNotFoundError:
+        # If the file doesn't exist, initialize an empty list of scores
+        scores = []
+
+    # Append the new score to the list of existing scores
+    scores.append(score)
+    
+    # Save the updated list of scores back to the file
+    with open('scores.json', 'w') as f:
+        json.dump(scores, f)
+
+def load_scores():
+    try:
+        with open('scores.json', 'r') as f:
+            scores = json.load(f)
+    except FileNotFoundError:
+        # If the file doesn't exist (e.g., first time running the game), return an empty list
+        scores = []
+    return scores
+
+def display_scores(window):
+    # Calculate the required height of the dialogue box based on the number of scores 
+    scores = load_scores()
+    scores.sort()
+    first_ten = scores[:10]
+    num_scores = len(scores)
+    if len(scores) > 10:
+        dialog_height = 300
+    else:
+        dialog_height = 30 * num_scores  # Assuming each score is rendered with a height of 30 pixels
+        
+    
+    #dialog_rect = pygame.Rect(100, 100, 400, 200)
+    #pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
+    # Sort the list of pairs based on the integer scores (second element of each pair) - MIGHT NEEEEEEED THIS LATEEEEEER
+    #sorted_scores = sorted(scores, key=lambda x: x[1])
+
+    
+     #Draw the dialogue box
+    pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, (100, 100, 200, dialog_height + 30))  # White background1
+    
+    # Render headers
+    font_header = pygame.font.Font(None, 24)
+    header_place_text = font_header.render("Place", True, (0, 0, 0))  # Black text for header
+    header_score_text = font_header.render("Score", True, (0, 0, 0))  # Black text for header
+    window.blit(header_place_text, (100 + 10, 100 + 10))  # Adjust position for headers
+    window.blit(header_score_text, (100 + 100, 100 + 10))  # Adjust position for headers
+    
+    
+    # Render each score onto the surface
+    font = pygame.font.Font(None, 24)
+    for i, score in enumerate(first_ten):
+        score_text = font.render(f"{i+1}.", True, (0, 0, 0))  # Black text for place
+        score_value_text = font.render(f"{score} turns", True, (0, 0, 0))  # Black text for score
+        window.blit(score_text, (100 + 10, 100 + 10 + (i + 1) * 30))  # Adjust position for place
+        window.blit(score_value_text, (100 + 100, 100 + 10 + (i + 1) * 30))  # Adjust position for score
+    pygame.display.update()
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                waiting = False 
+
+
+
+def endgame_check(adjacency_grid, difficulty_level, turns, button_actions):
+    if sum(element for row in adjacency_grid for element in row) == 0:
+      print("Wow, you finished!")
+      message = f"Congratulations! You finished in {turns} turns"
+      display_dialog(window, message, type="ok")
+      if difficulty_level == "hard":
+        save_score(turns)
+
+      window.fill(DARK_GREY if is_dark_mode else WHITE)
+      draw_grid(original_grid, adjacency_grid, 0)
+      for button in button_actions: #draw ZE BUTTONZ
+            button.draw(window)
+      display_scores(window)
+      pygame.display.flip()
+      turns=0
+      new_game_board(original_grid, adjacency_grid, choice=True)
+      
 
 
 def main():
@@ -593,8 +682,16 @@ def main():
     def defbutton_action():
         print("defButton clicked!")
         global difficulty_level
-        difficulty_level = "hard"
-
+        difficulty_level = "hard"    
+    
+    def dark_mode_action():
+        print("darkmode Button clicked!")
+        global is_dark_mode
+        is_dark_mode = not is_dark_mode
+    
+    def scorebutton_action():
+        display_scores(window)
+        
     def erasebutton_action():
         print("erase Button clicked!")
         rows_to_delete = []  # Store the indices of rows to delete
@@ -609,12 +706,14 @@ def main():
               del adjacency_grid[index]
               del original_grid[index]
 
-    redrawbutton = Button("Redraw", (WINDOW_WIDTH - 120, 40), redrawbutton_action)
-    easybutton = Button("Easy", (WINDOW_WIDTH - 120, 180), easybutton_action)
-    defbutton = Button("Difficult", (WINDOW_WIDTH - 120, 220), defbutton_action)
-    erasebutton = Button("Del empty", (WINDOW_WIDTH - 120, 260), erasebutton_action)
-    hintbutton = Button("Hint!", (WINDOW_WIDTH - 120, 300), hintbutton_action)
-    newbutton = Button("New game", (WINDOW_WIDTH - 120, 340), newbutton_action)
+    redrawbutton = Button("Redraw", (WINDOW_WIDTH - 125, 40), redrawbutton_action)
+    easybutton = Button("Easy", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), easybutton_action)
+    defbutton = Button("Difficult", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 160), defbutton_action)
+    erasebutton = Button("Del empty", (WINDOW_WIDTH - 125, 80), erasebutton_action)
+    hintbutton = Button("Hint!", (WINDOW_WIDTH - 125, 120), hintbutton_action)
+    newbutton = Button("New game", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 280), newbutton_action)
+    dark_modebutton = Button("Dark mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 80), dark_mode_action)
+    scorebutton = Button("Scoreboard", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 120), scorebutton_action)
 
     # Create font object for permanent text (difficulty level)
     font = pygame.font.Font(None, 24)  # You can change the font and size here
@@ -626,7 +725,9 @@ def main():
         defbutton: defbutton_action,
         erasebutton: erasebutton_action,
         newbutton: newbutton_action,
-        hintbutton: hintbutton_action
+        hintbutton: hintbutton_action,
+        dark_modebutton: dark_mode_action,
+        scorebutton: scorebutton_action
     }
     running = True
 
@@ -635,20 +736,20 @@ def main():
         # Handle events
         
         handle_mouse_events(grid, adjacency_grid, button_actions)
+        endgame_check(adjacency_grid, difficulty_level,turns, button_actions)
+        
         # Draw everything
-        window.fill(WHITE)
+        window.fill(DARK_GREY if is_dark_mode else WHITE)
         draw_grid(grid, adjacency_grid, elapsed_time)
-        easybutton.draw(window)
-        redrawbutton.draw(window)
-        defbutton.draw(window)
-        erasebutton.draw(window)
-        newbutton.draw(window)
-        hintbutton.draw(window)
+        for button in button_actions: #draw ZE BUTTONZ
+            button.draw(window)
+            
+            
         # Render permanent text
-        text_content = f"Diff: {difficulty_level}"
+        text_content = f"Mode: {difficulty_level}"
         difficulty_text = font.render(text_content, True, (0, 0, 0))  # Render text
         window.blit(
-            difficulty_text, (WINDOW_WIDTH - 120, 120)
+            difficulty_text, (WINDOW_WIDTH - 123, WINDOW_HEIGHT - 235)
         )  # Blit text onto the screen
 
         pygame.display.flip()

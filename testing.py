@@ -37,6 +37,7 @@ def draw_grid():
                 if x < len(grid[y]):  # Check if x is within the bounds of the row
                     number_text = font.render(str(grid[y-1][x]), True, BLACK)
                     screen.blit(number_text, rect.topleft)
+                    #screen.blit(number_text, (rect.topleft[0] + 10, rect.topleft[1]))  # Adjust x-coordinate for number rendering
                 else:
                     print("x out of range:", x)
         print()  # Add a newline for clarity
