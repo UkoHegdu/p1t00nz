@@ -73,15 +73,15 @@ class Button:
         self.position = position
         self.action = action
         self.font = pygame.font.Font(None, 24)
-        self.rect = pygame.Rect(self.position[0], self.position[1], 90, 30)
+        self.rect = pygame.Rect(self.position[0], self.position[1], 100, 30)
 
     def draw(self, screen):
         pygame.draw.rect(screen, BLACK if is_dark_mode else LIGHT_BLUE, self.rect)
-        pygame.draw.rect(screen, BLACK if is_dark_mode else LIGHT_BLUE, self.rect, 2)
+        pygame.draw.rect(screen, inverted_BLUE if is_dark_mode else BLUE, self.rect, 2)
         text_surface = self.font.render(self.text, True, WHITE if is_dark_mode else BLACK)
         text_rect = text_surface.get_rect(center=self.rect.center)
         screen.blit(text_surface, text_rect)
-        button_surface = pygame.Surface((90, 30))
+        button_surface = pygame.Surface((100, 30))
         button_surface.fill(inverted_BLUE if is_dark_mode else BLUE)
 
     def handle_event(self, event):
@@ -91,9 +91,10 @@ class Button:
                  self.action()
 
 
-# Define variables to keep track of selected & hint cells
+# Define variables to keep track of selected & hint cells & what moves have been made
 selected_cells = []
 hint_cells=[]
+moves=[]
 
 
 def draw_grid(original_grid, adjacency_grid, elapsed_time):
@@ -160,6 +161,7 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time):
 def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I think this function might handle mouse events
     global selected_cells
     global turns
+    global moves
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -204,12 +206,14 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                         num2 = original_grid[row2][col2]
                         if matching(adjacency_grid, selected_cells) == True:
                             print("Numbers match!")
+                            moves.append(selected_cells)
                             # Change the color of matched cells to DARK_BLUE and update adjacency grid to 0s
                             adjacency_grid[row1][col1] = 0
                             adjacency_grid[row2][col2] = 0
                             selected_cells = []
                             print("adjacency grid", adjacency_grid)
                             print("original grid", original_grid)
+                            print("moves, ", moves)
                         else:
                             selected_cells = []
 
@@ -308,6 +312,9 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
 
 def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s
     global turns
+    global moves
+    message = f"Move No. {turns}"
+    moves.append(message)
     turns=turns+1
     print("turn No. ", turns)
     append_list = []
@@ -317,7 +324,7 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
                 append_list.append(
                     element
                 )  # create a list of all the elements we need to add. i and j should point towards the last element
-    print(append_list)
+    #print(append_list)
     # print (i, j)
     # print ("garums",len(adjacency_grid[i])-1)
     for element in append_list:
@@ -325,8 +332,8 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
             # print("esmu ifaa")
             j = -1
             i = i + 1
-            print("i ",i)
-            print ("daliitais cipars, ", WINDOW_HEIGHT/GRID_HEIGHT)
+            #print("i ",i)
+            #print ("daliitais cipars, ", WINDOW_HEIGHT/GRID_HEIGHT)
             if i >= WINDOW_HEIGHT/GRID_HEIGHT:
                 display_dialog(window, "Game over!", type="ok")
                 new_game_board(original_grid, adjacency_grid, choice=True)
@@ -498,23 +505,31 @@ def display_dialog(window, message, type="ok"):  # the informative display dialo
     dialog_rect = pygame.Rect(100, 100, 400, 200)
     
     # Calculate center position for text and buttons
-    text_rect = text.get_rect(center=dialog_rect.center)
+    print("centers, ", dialog_rect.center)
+    text_x, text_y = dialog_rect.center
+    text_rect = text.get_rect(center=(text_x, text_y - 25))
     button_center_x = dialog_rect.centerx
     button_y = dialog_rect.centery + 50  # Adjust for button height
 
     if type == "ok":
 
         pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect, 2)
+
         # Draw button rectangle
-        button_rect = pygame.Rect(150, 100, 200, 50)
+        button_rect = pygame.Rect(150, 100, 120, 50)
         button_rect.center = (button_center_x, button_y)
         pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, button_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, button_rect, 2)
+
         # Render and draw button text
         button_text = font.render("OK", True, BLACK if is_dark_mode else WHITE)
         button_text_rect = button_text.get_rect(center=button_rect.center)
         window.blit(button_text, button_text_rect)
     elif type == "yes_no":
-        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, dialog_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect, 2)
+
         # Render "Yes" button
         yes_button = Button("Yes",(150, 150),action=lambda: print("Yes button clicked"))
         yes_button.rect.center = (button_center_x - 75, button_y)
@@ -596,8 +611,9 @@ def display_scores(window):
 
     
      #Draw the dialogue box
-    pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, (100, 100, 200, dialog_height + 30))  # White background1
-    
+    pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, (50, 75, 340, dialog_height + 85))  # White background1
+    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, (50, 75, 340, dialog_height + 85), 2)  # White background1
+
     # Render headers
     font_header = pygame.font.Font(None, 24)
     header_place_text = font_header.render("Place", True, (0, 0, 0))  # Black text for header
@@ -623,15 +639,29 @@ def display_scores(window):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False 
 
-
+def save_record_moves(turns):
+    global moves
+    scores = load_scores()
+    scores.sort()
+    if scores[0] > turns:    
+    # Save the updated list of scores back to the file
+      with open('move_order.json', 'w') as f:
+        #message = f"Turn order for finishing in {turns} turns"
+        #json.dump(message, f)
+        json.dump(moves, f)
 
 def endgame_check(adjacency_grid, difficulty_level, turns, button_actions):
+    global moves
     if sum(element for row in adjacency_grid for element in row) == 0:
       print("Wow, you finished!")
+      moves=[]
       message = f"Congratulations! You finished in {turns} turns"
       display_dialog(window, message, type="ok")
       if difficulty_level == "hard":
         save_score(turns)
+        save_record_moves(turns, moves)
+      if difficulty_level == "easy" and turns==2:
+        display_dialog(window, "Congratz, you beat easy mode!", type="ok")
 
       window.fill(DARK_GREY if is_dark_mode else WHITE)
       draw_grid(original_grid, adjacency_grid, 0)
@@ -747,7 +777,7 @@ def main():
             
         # Render permanent text
         text_content = f"Mode: {difficulty_level}"
-        difficulty_text = font.render(text_content, True, (0, 0, 0))  # Render text
+        difficulty_text = font.render(text_content, True, WHITE if is_dark_mode else BLACK)  # Render text
         window.blit(
             difficulty_text, (WINDOW_WIDTH - 123, WINDOW_HEIGHT - 235)
         )  # Blit text onto the screen
