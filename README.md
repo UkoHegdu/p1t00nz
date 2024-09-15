@@ -3,4 +3,6 @@ I am trying to build a numbers game that I used to play on paper while being bor
 Rules are in the help button when you play the game or in the code.
 If I have time, I'll create this as an .exe as well, now I can't be bothered.
 
+Run ciparinji.py to run the game.
+
 #game #notebook #killingtime #boredinuniversity
