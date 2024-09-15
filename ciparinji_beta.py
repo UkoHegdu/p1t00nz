@@ -1,6 +1,7 @@
 import pygame
 import time
 import json
+import os
 
 # Initialize Pygame
 # best score so far - 20 :(((
@@ -10,11 +11,13 @@ pygame.init()
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 1010
 window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("Skein")
+pygame.display.set_caption("Ruutinju klade")
 
 # Set window icon
 icon = pygame.image.load('skein_icon.png')
 pygame.display.set_icon(icon)
+help_image = pygame.image.load("heelp.png") #load the help image that will be shown when "Heeelp" is pressed
+
 
 
 # Define colors
@@ -97,7 +100,7 @@ hint_cells=[]
 moves=[]
 
 
-def draw_grid(original_grid, adjacency_grid, elapsed_time):
+def draw_grid(original_grid, adjacency_grid, elapsed_time): #ze draewing funcshen
     # Draw grid cells
     for row in range(len(original_grid)):
        # print("rindinja", row, len(original_grid))
@@ -310,7 +313,7 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
             return False
 
 
-def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s
+def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s to the existing board
     global turns
     global moves
     message = f"Move No. {turns}"
@@ -348,8 +351,10 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
         
         j = j + 1
 
-def new_game_board(original_grid, adjacency_grid, choice):
+def new_game_board(original_grid, adjacency_grid, choice): #restart the game
      global turns
+     global hint_cells
+     hint_cells=[]
      if choice == False:
         choice = display_dialog(window, "New game? Sure?", type="yes_no")
         #print("choice", choice)
@@ -362,14 +367,14 @@ def new_game_board(original_grid, adjacency_grid, choice):
                 adjacency_grid.append(row.copy())
             print (len(original_grid), "garums original grid")
             print (len(adjacency_grid), "garums adjacency grid")
-            turns=1
+            turns=0
             #draw_grid(grid, adjacency_grid)
             
 
      elif choice == False:
             print("pressed no")
 
-def hint_find(adjacency_grid):
+def hint_find(adjacency_grid): #what happens when you press the hint button 
     global hint_cells
     hint_cells=[]
     hint_found=False
@@ -471,13 +476,12 @@ def find_matches(adjacency_grid, i, j, hint_cells): #looking for adjacent cells 
                    found_match=True
                 search_done=True
     if found_match==False: #if there is no match found, we need to check last remaining direction
-        search_done=False
-        i=x
-        j=y
+        return False
     else:
         return hint_cells    
     
-    #look for an element above
+    #look for an element above (not actually necessary right now so commented out, might be necessary later if you want to check an arbitrary number for matches)
+    '''
     while search_done==False:
         if i==0: #first row
             search_done=True
@@ -492,8 +496,8 @@ def find_matches(adjacency_grid, i, j, hint_cells): #looking for adjacent cells 
                    hint_cells.append(cell_pos)
                    found_match=True
                 search_done=True
-    if found_match==False: #if there is no match found return false
-       return False
+    '''
+       
                  
 def display_dialog(window, message, type="ok"):  # the informative display dialogues (and the yes/no one as well)
 
@@ -567,7 +571,7 @@ def display_dialog(window, message, type="ok"):  # the informative display dialo
                     waiting = False  # Exit the loop if the No button is clicked
                     return False
 
-def save_score(score):
+def save_score(score): #only for saving scores
     try:
         # Load existing scores from the file
         with open('scores.json', 'r') as f:
@@ -583,7 +587,7 @@ def save_score(score):
     with open('scores.json', 'w') as f:
         json.dump(scores, f)
 
-def load_scores():
+def load_scores(): #loading scores from file onto the screen
     try:
         with open('scores.json', 'r') as f:
             scores = json.load(f)
@@ -630,7 +634,7 @@ def display_scores(window):
         window.blit(score_text, (100 + 10, 100 + 10 + (i + 1) * 30))  # Adjust position for place
         window.blit(score_value_text, (100 + 100, 100 + 10 + (i + 1) * 30))  # Adjust position for score
     pygame.display.update()
-    waiting = True
+    waiting = True 
     while waiting:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -639,8 +643,20 @@ def display_scores(window):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False 
 
-def save_record_moves(turns):
-    global moves
+def display_help(window):
+    window.blit(help_image, (100,100))
+    print("Image dimensions:", help_image.get_width(), "x", help_image.get_height())
+    pygame.display.update()
+    waiting = True 
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                waiting = False 
+    
+def save_record_moves(turns, moves):
     scores = load_scores()
     scores.sort()
     if scores[0] > turns:    
@@ -650,24 +666,27 @@ def save_record_moves(turns):
         #json.dump(message, f)
         json.dump(moves, f)
 
-def endgame_check(adjacency_grid, difficulty_level, turns, button_actions):
+def endgame_check(adjacency_grid, difficulty_level, turns, button_actions): #has the game ended?
     global moves
     if sum(element for row in adjacency_grid for element in row) == 0:
-      print("Wow, you finished!")
+      print("Wow, he finished!")
       moves=[]
-      message = f"Congratulations! You finished in {turns} turns"
+      message = f"Congratz! You finished in {turns} turns"
       display_dialog(window, message, type="ok")
+      pygame.display.update()
       if difficulty_level == "hard":
         save_score(turns)
         save_record_moves(turns, moves)
-      if difficulty_level == "easy" and turns==2:
+        display_scores(window)
+      if difficulty_level == "easy" and turns==1:
         display_dialog(window, "Congratz, you beat easy mode!", type="ok")
+        pygame.display.update()
+        display_dialog(window, "Try hard mode now!", type="ok")
 
       window.fill(DARK_GREY if is_dark_mode else WHITE)
       draw_grid(original_grid, adjacency_grid, 0)
       for button in button_actions: #draw ZE BUTTONZ
             button.draw(window)
-      display_scores(window)
       pygame.display.flip()
       turns=0
       new_game_board(original_grid, adjacency_grid, choice=True)
@@ -680,7 +699,7 @@ def main():
     clock = pygame.time.Clock()
     global start_time
     global turns
-    turns=1
+    turns=0
             
     def redrawbutton_action():
         #print("redraw Button clicked with difficulty", difficulty_level)
@@ -707,12 +726,24 @@ def main():
     def easybutton_action():
         print("easy Button clicked!")
         global difficulty_level
-        difficulty_level = "easy"
+        if difficulty_level == "easy":
+             return #y u clickin the same difficulty level bro?
+        else:        
+           if hint_cells != [] or adjacency_grid != original_grid: #has the game started?
+              display_dialog(window, "Game already started", type="ok")
+           else: 
+              difficulty_level = "easy"
 
     def defbutton_action():
         print("defButton clicked!")
         global difficulty_level
-        difficulty_level = "hard"    
+        if difficulty_level == "hard":
+            return #y u clickin the same difficulty level bro?
+        else: 
+           if hint_cells != [] or adjacency_grid != original_grid:
+              display_dialog(window, "Game already started", type="ok")
+           else: 
+              difficulty_level = "hard"    
     
     def dark_mode_action():
         print("darkmode Button clicked!")
@@ -722,8 +753,13 @@ def main():
     def scorebutton_action():
         display_scores(window)
         
+    def helpbutton_action():
+        display_help(window)
+                
     def erasebutton_action():
+        global turns
         print("erase Button clicked!")
+        turns=turns+1
         rows_to_delete = []  # Store the indices of rows to delete
         for index, row in enumerate(adjacency_grid):
             if all(col == 0 for col in row):
@@ -737,13 +773,17 @@ def main():
               del original_grid[index]
 
     redrawbutton = Button("Redraw", (WINDOW_WIDTH - 125, 40), redrawbutton_action)
-    easybutton = Button("Easy", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), easybutton_action)
-    defbutton = Button("Difficult", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 160), defbutton_action)
     erasebutton = Button("Del empty", (WINDOW_WIDTH - 125, 80), erasebutton_action)
     hintbutton = Button("Hint!", (WINDOW_WIDTH - 125, 120), hintbutton_action)
+    
+    helpbutton = Button("Heeelp!", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 320), helpbutton_action) 
     newbutton = Button("New game", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 280), newbutton_action)
-    dark_modebutton = Button("Dark mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 80), dark_mode_action)
+    easybutton = Button("Easy", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), easybutton_action)
+    defbutton = Button("Difficult", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 160), defbutton_action)
     scorebutton = Button("Scoreboard", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 120), scorebutton_action)
+    dark_modebutton = Button("Dark mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 80), dark_mode_action)
+    
+    
 
     # Create font object for permanent text (difficulty level)
     font = pygame.font.Font(None, 24)  # You can change the font and size here
@@ -757,7 +797,8 @@ def main():
         newbutton: newbutton_action,
         hintbutton: hintbutton_action,
         dark_modebutton: dark_mode_action,
-        scorebutton: scorebutton_action
+        scorebutton: scorebutton_action,
+        helpbutton: helpbutton_action
     }
     running = True
 
