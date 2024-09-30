@@ -6,3 +6,6 @@ If I have time, I'll create this as an .exe as well, now I can't be bothered.
 Run ciparinji.py to run the game.
 
 #game #notebook #killingtime #boredinuniversity
+
+![game screenshot](https://github.com/UkoHegdu/p1t00nz/blob/main/ruutinju_klade.png)
+
