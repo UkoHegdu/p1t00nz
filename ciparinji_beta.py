@@ -4,7 +4,7 @@ import json
 import os
 
 # Initialize Pygame
-# best score so far - 20 :(((
+
 pygame.init()
 
 # Set up the window
