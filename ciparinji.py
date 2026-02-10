@@ -132,11 +132,12 @@ def draw_erased_scribbles(surface, left, top, width, height, color, line_width=2
 
 
 def draw_grid(original_grid, adjacency_grid, elapsed_time): #ze draewing funcshen
-    # Draw grid cells
+    # Draw grid cells (use min row length so playback with variable-length rows is safe)
     for row in range(len(original_grid)):
-       # print("rindinja", row, len(original_grid))
-        for col in range(len(original_grid[row])):
-        #    print("kolonna", col)
+        if row >= len(adjacency_grid):
+            break
+        num_cols = min(len(original_grid[row]), len(adjacency_grid[row]))
+        for col in range(num_cols):
             cell_color = DARK_GREY if is_dark_mode else WHITE
             is_erased = adjacency_grid[row][col] == 0
             if is_erased:
@@ -621,7 +622,33 @@ def _normalize_scores(scores):
             })
     return out
 
-def save_score(turns, moves_list, initials=""):  # saves top 10 with turns, moves, initials
+
+def _count_moves_and_redraws(moves_list):
+    """One move = one pair removal or one redraw. Returns (move_count, redraw_count)."""
+    if not moves_list:
+        return 0, 0
+    moves_count = 0
+    redraws_count = 0
+    for m in moves_list:
+        if isinstance(m, dict) and m.get("action") == "redraw":
+            moves_count += 1
+            redraws_count += 1
+        elif isinstance(m, list) and len(m) == 2 and isinstance(m[0], (list, tuple)) and len(m[0]) == 2:
+            moves_count += 1
+    return moves_count, redraws_count
+
+
+def _get_move_count(entry):
+    """For ordering: use move count from moves list; legacy entries use turns; BOT placeholders = 200."""
+    if entry.get("initials") == "BOT" and not entry.get("moves"):
+        return 200
+    moves = entry.get("moves", [])
+    if moves:
+        return _count_moves_and_redraws(moves)[0]
+    return entry.get("turns", 999999)
+
+
+def save_score(turns, moves_list, initials=""):  # saves top 10 by move count
     initials = (initials or "---")[:3].upper() or "---"
     try:
         with open('scores.json', 'r') as f:
@@ -630,7 +657,7 @@ def save_score(turns, moves_list, initials=""):  # saves top 10 with turns, move
         scores = []
     scores = _normalize_scores(scores)
     scores.append({"turns": turns, "moves": moves_list, "initials": initials})
-    scores.sort(key=lambda x: x["turns"])
+    scores.sort(key=_get_move_count)
     scores = scores[:10]
     with open('scores.json', 'w') as f:
         json.dump(scores, f, indent=2)
@@ -652,6 +679,9 @@ def save_moves_record(turns, moves_list, initials, difficulty_level):
     if not isinstance(all_records, list):
         all_records = []
     all_records.append(record)
+    # Keep only the 10 best (lowest move count) replays
+    all_records.sort(key=lambda r: _count_moves_and_redraws(r.get("moves", []))[0] if r.get("moves") else r.get("turns", 999999))
+    all_records = all_records[:10]
     with open('moves.json', 'w') as f:
         json.dump(all_records, f, indent=2)
 
@@ -709,16 +739,16 @@ def display_initials_prompt(window):
 
 def display_scores(window):
     scores = load_scores()
-    scores.sort(key=lambda x: x["turns"])
+    scores.sort(key=_get_move_count)
     first_ten = scores[:10]
     while len(first_ten) < 10:
-        first_ten.append({"turns": 99, "moves": [], "initials": "BOT"})
+        first_ten.append({"turns": 200, "moves": [], "initials": "BOT"})
     num_scores = len(first_ten)
     row_h = 32
     header_h = 52
     margin_left = 14
     notebook_margin = 8
-    box_w = 340
+    box_w = 380
     box_h = header_h + num_scores * row_h + 50
     box_x = 60
     box_y = 70
@@ -739,12 +769,14 @@ def display_scores(window):
     header = font_header.render("Scoreboard", True, text_color)
     window.blit(header, (box_x + margin_left + 18, box_y + 6))
     col_place = box_x + margin_left + 18
-    col_initials = box_x + margin_left + 70
-    col_turns = box_x + margin_left + 150
+    col_initials = box_x + margin_left + 58
+    col_moves = box_x + margin_left + 130
+    col_redraws = box_x + margin_left + 200
     font_small = pygame.font.Font(None, 20)
     window.blit(font_small.render("#", True, text_color), (col_place, box_y + 30))
     window.blit(font_small.render("Initials", True, text_color), (col_initials, box_y + 30))
-    window.blit(font_small.render("Turns", True, text_color), (col_turns, box_y + 30))
+    window.blit(font_small.render("Moves", True, text_color), (col_moves, box_y + 30))
+    window.blit(font_small.render("Redraws", True, text_color), (col_redraws, box_y + 30))
     for i, entry in enumerate(first_ten):
         y = box_y + header_h + i * row_h + 6
         place_text = font.render(f"#{i + 1}", True, text_color)
@@ -752,10 +784,17 @@ def display_scores(window):
         if initials == "---" or not initials:
             initials = "BOT"
         initials_text = font.render(initials, True, text_color)
-        score_text = font.render(f"{entry['turns']} turns", True, text_color)
+        moves_list = entry.get("moves", [])
+        if entry.get("initials") == "BOT" and not moves_list:
+            move_count, redraw_count = 200, 20
+        else:
+            move_count, redraw_count = _count_moves_and_redraws(moves_list)
+        moves_text = font.render(str(move_count), True, text_color)
+        redraws_text = font.render(str(redraw_count), True, text_color)
         window.blit(place_text, (col_place, y))
         window.blit(initials_text, (col_initials, y))
-        window.blit(score_text, (col_turns, y))
+        window.blit(moves_text, (col_moves, y))
+        window.blit(redraws_text, (col_redraws, y))
     close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
     pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect)
     pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, close_rect, 2)
@@ -772,6 +811,73 @@ def display_scores(window):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if close_rect.collidepoint(event.pos):
                     waiting = False
+
+
+def display_playback_menu(window, records):
+    """Let the user pick a replay from moves.json."""
+    if not records:
+        display_dialog(window, "No replays available!", type="ok")
+        return None
+    # Sort by best move count first
+    records = sorted(records, key=lambda r: _count_moves_and_redraws(r.get("moves", []))[0] if r.get("moves") else r.get("turns", 999999))
+    num = len(records)
+    row_h = 32
+    header_h = 44
+    margin_left = 14
+    box_w = 420
+    box_h = header_h + num * row_h + 60
+    box_x = 40
+    box_y = 120
+    text_color = WHITE if is_dark_mode else BLACK
+    paper = (252, 248, 240) if not is_dark_mode else (45, 42, 38)
+
+    font = pygame.font.Font(None, 22)
+    font_header = pygame.font.Font(None, 24)
+
+    def draw_menu():
+        # Draw overlay panel
+        pygame.draw.rect(window, paper, (box_x, box_y, box_w, box_h))
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, (box_x, box_y, box_w, box_h), 2)
+        header = font_header.render("Playback – click a game to replay", True, text_color)
+        window.blit(header, (box_x + margin_left, box_y + 8))
+        col_hash = box_x + margin_left
+        col_init = box_x + margin_left + 40
+        col_mode = box_x + margin_left + 120
+        col_turns = box_x + margin_left + 220
+        head_y = box_y + header_h - 18
+        window.blit(font.render("#", True, text_color), (col_hash, head_y))
+        window.blit(font.render("Initials", True, text_color), (col_init, head_y))
+        window.blit(font.render("Mode", True, text_color), (col_mode, head_y))
+        window.blit(font.render("Turns", True, text_color), (col_turns, head_y))
+        row_rects = []
+        for i, rec in enumerate(records):
+            y = box_y + header_h + i * row_h + 4
+            window.blit(font.render(f"{i+1}", True, text_color), (col_hash, y))
+            window.blit(font.render(rec.get("initials", "---"), True, text_color), (col_init, y))
+            window.blit(font.render(rec.get("difficulty", "?"), True, text_color), (col_mode, y))
+            window.blit(font.render(str(rec.get("turns", "?")), True, text_color), (col_turns, y))
+            row_rects.append(pygame.Rect(box_x, box_y + header_h + i * row_h, box_w, row_h))
+        close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, close_rect, 2)
+        close_label = font.render("Close", True, text_color)
+        window.blit(close_label, close_label.get_rect(center=close_rect.center))
+        pygame.display.update()
+        return row_rects, close_rect
+
+    row_rects, close_rect = draw_menu()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if close_rect.collidepoint(event.pos):
+                    return None
+                for idx, rect in enumerate(row_rects):
+                    if rect.collidepoint(event.pos):
+                        return records[idx]
+
 
 def display_help(window):
     window.blit(help_image, (100,100))
@@ -801,6 +907,114 @@ def undo_last_action(original_grid, adjacency_grid):
         adjacency_grid.append(list(row))
     moves = prev_moves
     turns = prev_turns
+
+
+def playback_record(window, record):
+    """Replay a single game record from moves.json."""
+    # Fresh playback grids (do not touch live game state)
+    rows = [
+        [1, 2, 3, 4, 5, 6, 7, 8, 9],
+        [1, 1, 1, 2, 1, 3, 1, 4, 1],
+        [5, 1, 6, 1, 7, 1, 8, 1, 9],
+    ]
+    pb_original = [row.copy() for row in rows]
+    pb_adjacency = [row.copy() for row in rows]
+
+    def playback_redraw(adj_grid, orig_grid):
+        """Match game: collect non-zeros, append packed rows. Keep old rows unchanged (orig keeps numbers for display)."""
+        append_list = []
+        for row in adj_grid:
+            for element in row:
+                if element != 0:
+                    append_list.append(element)
+        new_adj_rows = []
+        cur = []
+        for val in append_list:
+            cur.append(val)
+            if len(cur) == 9:
+                new_adj_rows.append(cur[:])
+                cur = []
+        if cur:
+            new_adj_rows.append(cur[:])
+        # Game appends new rows only; old rows keep their values (orig keeps numbers so scribbles show over digits)
+        new_adj = [list(row) for row in adj_grid]
+        new_adj.extend(new_adj_rows)
+        new_orig = [list(row) for row in orig_grid]
+        new_orig.extend(new_adj_rows)  # new rows: same values as adjacency
+        return new_adj, new_orig
+
+    def playback_delete_empty(adj_grid, orig_grid):
+        # Remove fully empty rows from both grids
+        new_adj = []
+        new_orig = []
+        for a_row, o_row in zip(adj_grid, orig_grid):
+            if all(col == 0 for col in a_row):
+                continue
+            new_adj.append(a_row)
+            new_orig.append(o_row)
+        return new_adj, new_orig
+
+    paused = False
+    clock = pygame.time.Clock()
+    pause_rect = pygame.Rect(WINDOW_WIDTH - 125, 50, 100, 30)
+    exit_rect = pygame.Rect(WINDOW_WIDTH - 125, 90, 100, 30)
+    font_btn = pygame.font.Font(None, 24)
+    text_color = WHITE if is_dark_mode else BLACK
+
+    def draw_playback_frame():
+        window.fill(DARK_GREY if is_dark_mode else WHITE)
+        draw_grid(pb_original, pb_adjacency, 0)
+        label = "Resume" if paused else "Pause"
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, pause_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, pause_rect, 2)
+        window.blit(font_btn.render(label, True, text_color), font_btn.render(label, True, text_color).get_rect(center=pause_rect.center))
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, exit_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, exit_rect, 2)
+        window.blit(font_btn.render("Exit", True, text_color), font_btn.render("Exit", True, text_color).get_rect(center=exit_rect.center))
+        pygame.display.flip()
+
+    for move in record.get("moves", []):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.MOUSEBUTTONDOWN and exit_rect.collidepoint(event.pos):
+                return
+        if isinstance(move, dict) and "action" in move:
+            action = move["action"]
+            if action == "redraw":
+                pb_adjacency, pb_original = playback_redraw(pb_adjacency, pb_original)
+            elif action == "delete_empty_row":
+                pb_adjacency, pb_original = playback_delete_empty(pb_adjacency, pb_original)
+        else:
+            try:
+                (r1, c1), (r2, c2) = move
+                # Only zero adjacency (like the game); keep original so erased cells still show number + scribbles
+                if 0 <= r1 < len(pb_adjacency) and 0 <= c1 < len(pb_adjacency[r1]):
+                    pb_adjacency[r1][c1] = 0
+                if 0 <= r2 < len(pb_adjacency) and 0 <= c2 < len(pb_adjacency[r2]):
+                    pb_adjacency[r2][c2] = 0
+            except Exception:
+                pass
+
+        draw_playback_frame()
+        elapsed = 0
+        while elapsed < 1000:
+            dt = clock.tick(60)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    quit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if exit_rect.collidepoint(event.pos):
+                        return
+                    if pause_rect.collidepoint(event.pos):
+                        paused = not paused
+            if paused:
+                draw_playback_frame()
+                continue
+            elapsed += dt
+            draw_playback_frame()
 
 
 def endgame_check(adjacency_grid, difficulty_level, turns, button_actions): #has the game ended?
@@ -887,6 +1101,24 @@ def main():
     def helpbutton_action():
         display_help(window)
                 
+    def playbackbutton_action():
+        try:
+            with open('moves.json', 'r') as f:
+                records = json.load(f)
+        except FileNotFoundError:
+            records = []
+        if not isinstance(records, list) or not records:
+            display_dialog(window, "No replays available!", type="ok")
+            return
+        choice = display_playback_menu(window, records)
+        if choice is not None:
+            playback_record(window, choice)
+            # After playback, redraw current game state
+            window.fill(DARK_GREY if is_dark_mode else WHITE)
+            draw_grid(original_grid, adjacency_grid, 0)
+            for button in button_actions:
+                button.draw(window)
+            pygame.display.flip()
     def erasebutton_action():
         global turns
         global moves
@@ -915,6 +1147,7 @@ def main():
     helpbutton = Button("Heeelp!", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 320), helpbutton_action) 
     newbutton = Button("New game", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 280), newbutton_action)
     modebutton = Button("Mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), modebutton_action)
+    playbackbutton = Button("Playback", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 160), playbackbutton_action)
     scorebutton = Button("Scoreboard", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 120), scorebutton_action)
     dark_modebutton = Button("Dark mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 80), dark_mode_action)
     
@@ -933,6 +1166,7 @@ def main():
         undobutton: lambda: undo_last_action(original_grid, adjacency_grid),
         dark_modebutton: dark_mode_action,
         scorebutton: scorebutton_action,
+        playbackbutton: playbackbutton_action,
         helpbutton: helpbutton_action
     }
     running = True
