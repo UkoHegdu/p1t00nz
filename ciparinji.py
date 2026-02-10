@@ -1,6 +1,9 @@
+import math
+import copy
 import pygame
 import time
 import json
+import os
 
 # I have not finished this but for now I will leave it as it is
 # it is a game I played in my notebooks while in university, here it is without redrawing and with the option to check for hints (to play it properly - in the hard mode)
@@ -103,6 +106,29 @@ class Button:
 selected_cells = []
 hint_cells=[]
 moves=[]
+history=[]
+
+
+def _hand_drawn_horizontal_line(left, top, width, height, line_index, num_lines):
+    """One continuous horizontal wavy line (hand-drawn, mostly straight)."""
+    t0 = (line_index + 1) / (num_lines + 2)
+    y_base = top + height * t0
+    points = []
+    n = 14
+    for i in range(n + 1):
+        x = left + width * (i / n)
+        wobble = height * 0.02 * math.sin(line_index * 1.5 + i * 0.7) + height * 0.01 * math.sin(i * 1.9 + line_index)
+        y = y_base + wobble
+        points.append((x, y))
+    return points
+
+
+def draw_erased_scribbles(surface, left, top, width, height, color, line_width=2):
+    """Hand-drawn horizontal scribbles: continuous wavy lines, not too dense."""
+    num_lines = 9
+    for i in range(num_lines):
+        pts = _hand_drawn_horizontal_line(left, top, width, height, i, num_lines)
+        pygame.draw.lines(surface, color, False, pts, line_width)
 
 
 def draw_grid(original_grid, adjacency_grid, elapsed_time): #ze draewing funcshen
@@ -112,28 +138,28 @@ def draw_grid(original_grid, adjacency_grid, elapsed_time): #ze draewing funcshe
         for col in range(len(original_grid[row])):
         #    print("kolonna", col)
             cell_color = DARK_GREY if is_dark_mode else WHITE
-            if adjacency_grid[row][col] == 0:
-                cell_color = inverted_DARK_BLUE if is_dark_mode else DARK_BLUE
+            is_erased = adjacency_grid[row][col] == 0
+            if is_erased:
+                cell_color = WHITE if not is_dark_mode else DARK_GREY
             elif (row, col) in selected_cells:
                 cell_color = inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE
             elif (row, col) in hint_cells and elapsed_time < 3:
-                cell_color = inverted_LIGHT_GREEN if is_dark_mode else LIGHT_GREEN   
+                cell_color = inverted_LIGHT_GREEN if is_dark_mode else LIGHT_GREEN
+            cell_left = col * GRID_WIDTH + GRID_WIDTH
+            cell_top = row * GRID_HEIGHT + GRID_HEIGHT
             pygame.draw.rect(
                 window,
                 cell_color,
-                [
-                    col * GRID_WIDTH + GRID_WIDTH, #*1* reference> for visual purposes, so that cells start on row 2, instead of 1, like you would use a notepad 
-                    row * GRID_HEIGHT + GRID_HEIGHT,
-                    GRID_WIDTH,
-                    GRID_HEIGHT,
-                ],
+                [cell_left, cell_top, GRID_WIDTH, GRID_HEIGHT],
             )
             font = pygame.font.Font(None, 40)
             text = font.render(str(original_grid[row][col]), True, WHITE if is_dark_mode else BLACK)
             text_rect = text.get_rect(
-                #center=(col * GRID_WIDTH + (GRID_WIDTH) / 2, row * (GRID_HEIGHT) + (GRID_HEIGHT) / 2))  # Adjusted to center
-                center=( col * GRID_WIDTH + GRID_WIDTH / 2 + GRID_WIDTH, row * GRID_HEIGHT + GRID_HEIGHT / 2 + GRID_HEIGHT))  # Adjusted to center & see *1* reference
+                center=(cell_left + GRID_WIDTH / 2, cell_top + GRID_HEIGHT / 2))
             window.blit(text, text_rect)
+            if is_erased:
+                scribble_color = (80, 70, 90) if not is_dark_mode else (180, 175, 165)
+                draw_erased_scribbles(window, cell_left, cell_top, GRID_WIDTH, GRID_HEIGHT, scribble_color, 2)
 
     # Draw horizontal lines
     for row in range(WINDOW_HEIGHT // GRID_HEIGHT + 1):
@@ -170,6 +196,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
     global selected_cells
     global turns
     global moves
+    global history
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -207,6 +234,8 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                             selected_cells.append(cell_pos)
                             print(selected_cells)
                     if len(selected_cells) == 2:
+                        # Save state before applying a matching move so we can undo
+                        history.append(copy.deepcopy((original_grid, adjacency_grid, moves, turns)))
                         # Compare numbers in the selected cells
                         row1, col1 = selected_cells[0]
                         row2, col2 = selected_cells[1]
@@ -214,7 +243,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                         num2 = original_grid[row2][col2]
                         if matching(adjacency_grid, selected_cells) == True:
                             print("Numbers match!")
-                            moves.append(selected_cells)
+                            moves.append([[row1, col1], [row2, col2]])
                             # Change the color of matched cells to DARK_BLUE and update adjacency grid to 0s
                             adjacency_grid[row1][col1] = 0
                             adjacency_grid[row2][col2] = 0
@@ -321,9 +350,10 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
 def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s to the existing board
     global turns
     global moves
-    message = f"Move No. {turns}"
-    moves.append(message)
-    turns=turns+1
+    global history
+    history.append(copy.deepcopy((original_grid, adjacency_grid, moves, turns)))
+    moves.append({"action": "redraw"})
+    turns = turns + 1
     print("turn No. ", turns)
     append_list = []
     for i, row in enumerate(adjacency_grid):
@@ -359,6 +389,8 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
 def new_game_board(original_grid, adjacency_grid, choice): #restart the game
      global turns
      global hint_cells
+     global moves
+     global history
      hint_cells=[]
      if choice == False:
         choice = display_dialog(window, "New game? Sure?", type="yes_no")
@@ -373,6 +405,8 @@ def new_game_board(original_grid, adjacency_grid, choice): #restart the game
             print (len(original_grid), "garums original grid")
             print (len(adjacency_grid), "garums adjacency grid")
             turns=0
+            moves=[]
+            history=[]
             #draw_grid(grid, adjacency_grid)
             
 
@@ -506,27 +540,24 @@ def find_matches(adjacency_grid, i, j, hint_cells): #looking for adjacent cells 
                  
 def display_dialog(window, message, type="ok"):  # the informative display dialogues (and the yes/no one as well)
 
-    # Render text
     font = pygame.font.Font(None, 36)
     text = font.render(message, True, WHITE if is_dark_mode else BLACK)
-    
-    # Create rectangle for dialog area
-    dialog_rect = pygame.Rect(100, 100, 400, 200)
-    
-    # Calculate center position for text and buttons
-    print("centers, ", dialog_rect.center)
+    text_rect = text.get_rect()
+    min_w = max(400, text_rect.width + 80)
+    min_h = max(200, text_rect.height + 100)
+    dialog_rect = pygame.Rect(100, 100, min_w, min_h)
+
     text_x, text_y = dialog_rect.center
     text_rect = text.get_rect(center=(text_x, text_y - 25))
     button_center_x = dialog_rect.centerx
-    button_y = dialog_rect.centery + 50  # Adjust for button height
+    button_y = dialog_rect.centery + 50
 
     if type == "ok":
 
         pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
         pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect, 2)
 
-        # Draw button rectangle
-        button_rect = pygame.Rect(150, 100, 120, 50)
+        button_rect = pygame.Rect(0, 0, 120, 50)
         button_rect.center = (button_center_x, button_y)
         pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, button_rect)
         pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, button_rect, 2)
@@ -576,77 +607,171 @@ def display_dialog(window, message, type="ok"):  # the informative display dialo
                     waiting = False  # Exit the loop if the No button is clicked
                     return False
 
-def save_score(score): #only for saving scores
+def _normalize_scores(scores):
+    """Convert legacy list-of-ints to list of {turns, moves, initials}."""
+    out = []
+    for s in scores:
+        if isinstance(s, int):
+            out.append({"turns": s, "moves": [], "initials": "---"})
+        else:
+            out.append({
+                "turns": s.get("turns", 0),
+                "moves": s.get("moves", []),
+                "initials": s.get("initials", "---")[:3].upper() or "---",
+            })
+    return out
+
+def save_score(turns, moves_list, initials=""):  # saves top 10 with turns, moves, initials
+    initials = (initials or "---")[:3].upper() or "---"
     try:
-        # Load existing scores from the file
         with open('scores.json', 'r') as f:
             scores = json.load(f)
     except FileNotFoundError:
-        # If the file doesn't exist, initialize an empty list of scores
         scores = []
-
-    # Append the new score to the list of existing scores
-    scores.append(score)
-    
-    # Save the updated list of scores back to the file
+    scores = _normalize_scores(scores)
+    scores.append({"turns": turns, "moves": moves_list, "initials": initials})
+    scores.sort(key=lambda x: x["turns"])
+    scores = scores[:10]
     with open('scores.json', 'w') as f:
-        json.dump(scores, f)
+        json.dump(scores, f, indent=2)
 
-def load_scores(): #loading scores from file onto the screen
+
+def save_moves_record(turns, moves_list, initials, difficulty_level):
+    """Append full move history for a finished game into moves.json."""
+    record = {
+        "turns": turns,
+        "initials": (initials or "---")[:3].upper() or "---",
+        "difficulty": difficulty_level,
+        "moves": moves_list,
+    }
+    try:
+        with open('moves.json', 'r') as f:
+            all_records = json.load(f)
+    except FileNotFoundError:
+        all_records = []
+    if not isinstance(all_records, list):
+        all_records = []
+    all_records.append(record)
+    with open('moves.json', 'w') as f:
+        json.dump(all_records, f, indent=2)
+
+def load_scores():  # returns list of {"turns": n, "moves": [...]}
     try:
         with open('scores.json', 'r') as f:
             scores = json.load(f)
     except FileNotFoundError:
-        # If the file doesn't exist (e.g., first time running the game), return an empty list
         scores = []
-    return scores
+    return _normalize_scores(scores)
+
+
+def display_initials_prompt(window):
+    """Prompt for 3-letter initials; returns string of up to 3 chars (uppercase)."""
+    buf = []
+    font = pygame.font.Font(None, 36)
+    dialog_rect = pygame.Rect(150, 280, 340, 140)
+    ok_rect = pygame.Rect(dialog_rect.centerx - 45, dialog_rect.bottom - 50, 90, 36)
+    text_color = WHITE if is_dark_mode else BLACK
+
+    def draw():
+        pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, dialog_rect, 2)
+        prompt = font.render("Enter initials (3 letters):", True, text_color)
+        window.blit(prompt, (dialog_rect.x + 20, dialog_rect.y + 18))
+        display_str = "".join(buf).ljust(3, "_")
+        cur_text = font.render(display_str, True, text_color)
+        window.blit(cur_text, (dialog_rect.x + 20, dialog_rect.y + 52))
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, ok_rect)
+        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, ok_rect, 2)
+        ok_label = font.render("OK", True, text_color)
+        window.blit(ok_label, ok_label.get_rect(center=ok_rect.center))
+        pygame.display.update()
+
+    draw()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                    return "".join(buf)[:3].upper() or "---"
+                if event.key == pygame.K_BACKSPACE:
+                    if buf:
+                        buf.pop()
+                        draw()
+                elif event.unicode and len(buf) < 3 and event.unicode.isalpha():
+                    buf.append(event.unicode.upper())
+                    draw()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if ok_rect.collidepoint(event.pos):
+                    return "".join(buf)[:3].upper() or "---"
+
 
 def display_scores(window):
-    # Calculate the required height of the dialogue box based on the number of scores 
     scores = load_scores()
-    scores.sort()
+    scores.sort(key=lambda x: x["turns"])
     first_ten = scores[:10]
-    num_scores = len(scores)
-    if len(scores) > 10:
-        dialog_height = 300
-    else:
-        dialog_height = 30 * num_scores  # Assuming each score is rendered with a height of 30 pixels
-        
-    
-    #dialog_rect = pygame.Rect(100, 100, 400, 200)
-    #pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, dialog_rect)
-    # Sort the list of pairs based on the integer scores (second element of each pair) - MIGHT NEEEEEEED THIS LATEEEEEER
-    #sorted_scores = sorted(scores, key=lambda x: x[1])
+    while len(first_ten) < 10:
+        first_ten.append({"turns": 99, "moves": [], "initials": "BOT"})
+    num_scores = len(first_ten)
+    row_h = 32
+    header_h = 52
+    margin_left = 14
+    notebook_margin = 8
+    box_w = 340
+    box_h = header_h + num_scores * row_h + 50
+    box_x = 60
+    box_y = 70
+    text_color = WHITE if is_dark_mode else BLACK
+    paper = (252, 248, 240) if not is_dark_mode else (45, 42, 38)
+    line_color = (200, 190, 180) if not is_dark_mode else (70, 68, 65)
+    red_line = (200, 60, 60) if not is_dark_mode else (180, 80, 80)
 
-    
-     #Draw the dialogue box
-    pygame.draw.rect(window, inverted_LIGHT_BLUE if is_dark_mode else LIGHT_BLUE, (50, 75, 340, dialog_height + 85))  # White background1
-    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, (50, 75, 340, dialog_height + 85), 2)  # White background1
+    pygame.draw.rect(window, paper, (box_x, box_y, box_w, box_h))
+    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, (box_x, box_y, box_w, box_h), 2)
+    pygame.draw.rect(window, red_line, (box_x + notebook_margin, box_y, 3, box_h))
+    for r in range(1, num_scores + 1):
+        y = box_y + header_h + r * row_h
+        pygame.draw.line(window, line_color, (box_x + margin_left, y), (box_x + box_w - 10, y), 1)
 
-    # Render headers
-    font_header = pygame.font.Font(None, 24)
-    header_place_text = font_header.render("Place", True, (0, 0, 0))  # Black text for header
-    header_score_text = font_header.render("Score", True, (0, 0, 0))  # Black text for header
-    window.blit(header_place_text, (100 + 10, 100 + 10))  # Adjust position for headers
-    window.blit(header_score_text, (100 + 100, 100 + 10))  # Adjust position for headers
-    
-    
-    # Render each score onto the surface
     font = pygame.font.Font(None, 24)
-    for i, score in enumerate(first_ten):
-        score_text = font.render(f"{i+1}.", True, (0, 0, 0))  # Black text for place
-        score_value_text = font.render(f"{score} turns", True, (0, 0, 0))  # Black text for score
-        window.blit(score_text, (100 + 10, 100 + 10 + (i + 1) * 30))  # Adjust position for place
-        window.blit(score_value_text, (100 + 100, 100 + 10 + (i + 1) * 30))  # Adjust position for score
+    font_header = pygame.font.Font(None, 26)
+    header = font_header.render("Scoreboard", True, text_color)
+    window.blit(header, (box_x + margin_left + 18, box_y + 6))
+    col_place = box_x + margin_left + 18
+    col_initials = box_x + margin_left + 70
+    col_turns = box_x + margin_left + 150
+    font_small = pygame.font.Font(None, 20)
+    window.blit(font_small.render("#", True, text_color), (col_place, box_y + 30))
+    window.blit(font_small.render("Initials", True, text_color), (col_initials, box_y + 30))
+    window.blit(font_small.render("Turns", True, text_color), (col_turns, box_y + 30))
+    for i, entry in enumerate(first_ten):
+        y = box_y + header_h + i * row_h + 6
+        place_text = font.render(f"#{i + 1}", True, text_color)
+        initials = entry.get("initials", "---")
+        if initials == "---" or not initials:
+            initials = "BOT"
+        initials_text = font.render(initials, True, text_color)
+        score_text = font.render(f"{entry['turns']} turns", True, text_color)
+        window.blit(place_text, (col_place, y))
+        window.blit(initials_text, (col_initials, y))
+        window.blit(score_text, (col_turns, y))
+    close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
+    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect)
+    pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, close_rect, 2)
+    close_label = font.render("Close", True, text_color)
+    window.blit(close_label, close_label.get_rect(center=close_rect.center))
     pygame.display.update()
-    waiting = True 
+
+    waiting = True
     while waiting:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                waiting = False 
+                if close_rect.collidepoint(event.pos):
+                    waiting = False
 
 def display_help(window):
     window.blit(help_image, (100,100))
@@ -660,31 +785,45 @@ def display_help(window):
                 quit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False 
-    
-def save_record_moves(turns, moves):
-    scores = load_scores()
-    scores.sort()
-    if scores[0] > turns:    
-    # Save the updated list of scores back to the file
-      with open('move_order.json', 'w') as f:
-        #message = f"Turn order for finishing in {turns} turns"
-        #json.dump(message, f)
-        json.dump(moves, f)
+def undo_last_action(original_grid, adjacency_grid):
+    """Revert the last move/redraw/delete-empty if possible."""
+    global moves, turns, history
+    if not history:
+        display_dialog(window, "Nothing to undo!", type="ok")
+        return
+    prev_original, prev_adjacency, prev_moves, prev_turns = history.pop()
+    # Deepcopy to avoid aliasing issues across undos
+    original_grid.clear()
+    adjacency_grid.clear()
+    for row in prev_original:
+        original_grid.append(list(row))
+    for row in prev_adjacency:
+        adjacency_grid.append(list(row))
+    moves = prev_moves
+    turns = prev_turns
+
 
 def endgame_check(adjacency_grid, difficulty_level, turns, button_actions): #has the game ended?
     global moves
     if sum(element for row in adjacency_grid for element in row) == 0:
       print("Wow, he finished!")
-      moves=[]
-      message = f"Congratz! You finished in {turns} turns"
+      moves_copy = list(moves)
+      moves = []
+      message = f"Congratulations, you finished in {turns} turns"
+      # First show the fully erased board (including last crossed-out pair)
+      window.fill(DARK_GREY if is_dark_mode else WHITE)
+      draw_grid(original_grid, adjacency_grid, 0)
+      for button in button_actions:  # redraw buttons
+            button.draw(window)
+      pygame.display.flip()
       display_dialog(window, message, type="ok")
       pygame.display.update()
-      if difficulty_level == "hard":
-        save_score(turns)
-        save_record_moves(turns, moves)
-        display_scores(window)
+      initials = display_initials_prompt(window)
+      save_score(turns, moves_copy, initials)
+      save_moves_record(turns, moves_copy, initials, difficulty_level)
+      display_scores(window)
       if difficulty_level == "easy" and turns==1:
-        display_dialog(window, "Congratz, you beat easy mode!", type="ok")
+        display_dialog(window, "Congratulations, you beat easy mode!", type="ok")
         pygame.display.update()
         display_dialog(window, "Try hard mode now!", type="ok")
 
@@ -728,27 +867,14 @@ def main():
         print(original_grid)
        
 
-    def easybutton_action():
-        print("easy Button clicked!")
+    def modebutton_action():
+        print("Mode Button clicked!")
         global difficulty_level
-        if difficulty_level == "easy":
-             return #y u clickin the same difficulty level bro?
-        else:        
-           if hint_cells != [] or adjacency_grid != original_grid: #has the game started?
-              display_dialog(window, "Game already started", type="ok")
-           else: 
-              difficulty_level = "easy"
-
-    def defbutton_action():
-        print("defButton clicked!")
-        global difficulty_level
-        if difficulty_level == "hard":
-            return #y u clickin the same difficulty level bro?
-        else: 
-           if hint_cells != [] or adjacency_grid != original_grid:
-              display_dialog(window, "Game already started", type="ok")
-           else: 
-              difficulty_level = "hard"    
+        # Don't allow changing mode mid-game
+        if hint_cells != [] or adjacency_grid != original_grid:
+            display_dialog(window, "Game already started", type="ok")
+        else:
+            difficulty_level = "hard" if difficulty_level == "easy" else "easy"
     
     def dark_mode_action():
         print("darkmode Button clicked!")
@@ -763,8 +889,10 @@ def main():
                 
     def erasebutton_action():
         global turns
+        global moves
+        global history
         print("erase Button clicked!")
-        turns=turns+1
+        turns = turns + 1
         rows_to_delete = []  # Store the indices of rows to delete
         for index, row in enumerate(adjacency_grid):
             if all(col == 0 for col in row):
@@ -772,6 +900,8 @@ def main():
         if rows_to_delete == []:
            display_dialog(window, "There are no empty rows!", type="ok")
         else:
+          history.append(copy.deepcopy((original_grid, adjacency_grid, moves, turns)))
+          moves.append({"action": "delete_empty_row"})
           # Delete rows from adjacency_grid and original_grid
           for index in reversed(rows_to_delete):
               del adjacency_grid[index]
@@ -780,11 +910,11 @@ def main():
     redrawbutton = Button("Redraw", (WINDOW_WIDTH - 125, 40), redrawbutton_action)
     erasebutton = Button("Del empty", (WINDOW_WIDTH - 125, 80), erasebutton_action)
     hintbutton = Button("Hint!", (WINDOW_WIDTH - 125, 120), hintbutton_action)
+    undobutton = Button("Undo", (WINDOW_WIDTH - 125, 160), lambda: undo_last_action(original_grid, adjacency_grid))
     
     helpbutton = Button("Heeelp!", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 320), helpbutton_action) 
     newbutton = Button("New game", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 280), newbutton_action)
-    easybutton = Button("Easy", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), easybutton_action)
-    defbutton = Button("Difficult", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 160), defbutton_action)
+    modebutton = Button("Mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 200), modebutton_action)
     scorebutton = Button("Scoreboard", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 120), scorebutton_action)
     dark_modebutton = Button("Dark mode", (WINDOW_WIDTH - 125, WINDOW_HEIGHT - 80), dark_mode_action)
     
@@ -796,11 +926,11 @@ def main():
     # Store button-action pairs in a dictionary
     button_actions = {
         redrawbutton: redrawbutton_action,
-        easybutton: easybutton_action,
-        defbutton: defbutton_action,
+        modebutton: modebutton_action,
         erasebutton: erasebutton_action,
         newbutton: newbutton_action,
         hintbutton: hintbutton_action,
+        undobutton: lambda: undo_last_action(original_grid, adjacency_grid),
         dark_modebutton: dark_mode_action,
         scorebutton: scorebutton_action,
         helpbutton: helpbutton_action

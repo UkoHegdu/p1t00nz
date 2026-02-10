@@ -1,6 +1,8 @@
 [
   {
     "turns": 6,
+    "initials": "MOO",
+    "difficulty": "hard",
     "moves": [
       [
         [
@@ -700,52 +702,6 @@
           1
         ]
       ]
-    ],
-    "initials": "MOO"
-  },
-  {
-    "turns": 20,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 28,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 29,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
-  },
-  {
-    "turns": 30,
-    "moves": [],
-    "initials": "---"
+    ]
   }
 ]
