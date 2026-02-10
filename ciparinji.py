@@ -216,7 +216,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                     if button.rect.collidepoint(event.pos):  # Check if mouse click is inside the button
                         print("Button clicked!", button.text)
                         action()
-                if (col > NUM_COLS - 1 or row > len(adjacency_grid) - 1):  # handle situation if you click outside the numbers
+                if (row < 0 or row >= len(adjacency_grid) or col < 0 or col >= len(adjacency_grid[row])):
                     print("out of boundz")
                     selected_cells = []
                     return
@@ -225,7 +225,7 @@ def handle_mouse_events(original_grid, adjacency_grid, button_actions):  # I thi
                     display_dialog(window, "Number already removed!", type="ok")
                     selected_cells = []
 
-                elif 0 <= row < len(original_grid) and 0 <= col < NUM_COLS:
+                elif 0 <= row < len(original_grid) and 0 <= col < len(adjacency_grid[row]):
                     cell_pos = (row, col)
                     print("cell_pos", cell_pos)
                     if len(selected_cells) < 2:
@@ -348,7 +348,7 @@ def is_adjacent(adjacency_grid, row1, col1, row2, col2):  # mēģinām izpīpēt
             return False
 
 
-def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not 0s to the existing board
+def redraw_board(original_grid, adjacency_grid):  # collect non-zeros, place starting after last cell (extend current row or append new rows)
     global turns
     global moves
     global history
@@ -357,35 +357,26 @@ def redraw_board(original_grid, adjacency_grid):  # add the numbers that are not
     turns = turns + 1
     print("turn No. ", turns)
     append_list = []
-    for i, row in enumerate(adjacency_grid):
-        for j, element in enumerate(row):
+    for row in adjacency_grid:
+        for element in row:
             if element != 0:
-                append_list.append(
-                    element
-                )  # create a list of all the elements we need to add. i and j should point towards the last element
-    #print(append_list)
-    # print (i, j)
-    # print ("garums",len(adjacency_grid[i])-1)
+                append_list.append(element)
+    # Start after the last cell in the grid so we extend the current row if it has < 9 elements
+    i = len(adjacency_grid) - 1
+    j = len(adjacency_grid[-1]) - 1
     for element in append_list:
-        if (j == 8):  # if we are looking at the last element of a row, jump to the next one
-            # print("esmu ifaa")
-            j = -1
+        j = j + 1
+        if j >= 9:
+            j = 0
             i = i + 1
-            #print("i ",i)
-            #print ("daliitais cipars, ", WINDOW_HEIGHT/GRID_HEIGHT)
-            if i >= WINDOW_HEIGHT/GRID_HEIGHT:
+            if i >= WINDOW_HEIGHT / GRID_HEIGHT:
                 display_dialog(window, "Game over!", type="ok")
                 new_game_board(original_grid, adjacency_grid, choice=True)
                 return False
-            else:
-                original_grid.append([])  # need to add new rows otherwise the poor soul is out of range
-                adjacency_grid.append([])
-        # print(i, j, " ifaa")
-        #  print(i, j)
+            original_grid.append([])
+            adjacency_grid.append([])
         adjacency_grid[i].append(element)
         original_grid[i].append(element)
-        
-        j = j + 1
 
 def new_game_board(original_grid, adjacency_grid, choice): #restart the game
      global turns
@@ -639,13 +630,11 @@ def _count_moves_and_redraws(moves_list):
 
 
 def _get_move_count(entry):
-    """For ordering: use move count from moves list; legacy entries use turns; BOT placeholders = 200."""
-    if entry.get("initials") == "BOT" and not entry.get("moves"):
-        return 200
+    """For ordering: use move count from moves list; entries with no moves (old BOT-like) get 200."""
     moves = entry.get("moves", [])
-    if moves:
-        return _count_moves_and_redraws(moves)[0]
-    return entry.get("turns", 999999)
+    if not moves:
+        return 200
+    return _count_moves_and_redraws(moves)[0]
 
 
 def save_score(turns, moves_list, initials=""):  # saves top 10 by move count
@@ -785,8 +774,9 @@ def display_scores(window):
             initials = "BOT"
         initials_text = font.render(initials, True, text_color)
         moves_list = entry.get("moves", [])
-        if entry.get("initials") == "BOT" and not moves_list:
-            move_count, redraw_count = 200, 20
+        # Placeholder / legacy entries with no moves: show 200/200 so they sit below real scores
+        if not moves_list:
+            move_count, redraw_count = 200, 200
         else:
             move_count, redraw_count = _count_moves_and_redraws(moves_list)
         moves_text = font.render(str(move_count), True, text_color)
@@ -796,9 +786,9 @@ def display_scores(window):
         window.blit(moves_text, (col_moves, y))
         window.blit(redraws_text, (col_redraws, y))
     close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
-    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect)
-    pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, close_rect, 2)
-    close_label = font.render("Close", True, text_color)
+    pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, close_rect)
+    pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect, 2)
+    close_label = font.render("Close", True, WHITE if is_dark_mode else BLACK)
     window.blit(close_label, close_label.get_rect(center=close_rect.center))
     pygame.display.update()
 
@@ -858,9 +848,9 @@ def display_playback_menu(window, records):
             window.blit(font.render(str(rec.get("turns", "?")), True, text_color), (col_turns, y))
             row_rects.append(pygame.Rect(box_x, box_y + header_h + i * row_h, box_w, row_h))
         close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
-        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect)
-        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, close_rect, 2)
-        close_label = font.render("Close", True, text_color)
+        pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, close_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect, 2)
+        close_label = font.render("Close", True, WHITE if is_dark_mode else BLACK)
         window.blit(close_label, close_label.get_rect(center=close_rect.center))
         pygame.display.update()
         return row_rects, close_rect
@@ -921,26 +911,25 @@ def playback_record(window, record):
     pb_adjacency = [row.copy() for row in rows]
 
     def playback_redraw(adj_grid, orig_grid):
-        """Match game: collect non-zeros, append packed rows. Keep old rows unchanged (orig keeps numbers for display)."""
+        """Match game: collect non-zeros, place after last cell (extend current row or append new rows). Zero cells unchanged."""
         append_list = []
         for row in adj_grid:
             for element in row:
                 if element != 0:
                     append_list.append(element)
-        new_adj_rows = []
-        cur = []
-        for val in append_list:
-            cur.append(val)
-            if len(cur) == 9:
-                new_adj_rows.append(cur[:])
-                cur = []
-        if cur:
-            new_adj_rows.append(cur[:])
-        # Game appends new rows only; old rows keep their values (orig keeps numbers so scribbles show over digits)
         new_adj = [list(row) for row in adj_grid]
-        new_adj.extend(new_adj_rows)
         new_orig = [list(row) for row in orig_grid]
-        new_orig.extend(new_adj_rows)  # new rows: same values as adjacency
+        i = len(new_adj) - 1
+        j = len(new_adj[-1]) - 1
+        for val in append_list:
+            j = j + 1
+            if j >= 9:
+                j = 0
+                i = i + 1
+                new_adj.append([])
+                new_orig.append([])  # new list so pair-removal does not zero pb_original
+            new_adj[i].append(val)
+            new_orig[i].append(val)
         return new_adj, new_orig
 
     def playback_delete_empty(adj_grid, orig_grid):
@@ -965,12 +954,12 @@ def playback_record(window, record):
         window.fill(DARK_GREY if is_dark_mode else WHITE)
         draw_grid(pb_original, pb_adjacency, 0)
         label = "Resume" if paused else "Pause"
-        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, pause_rect)
-        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, pause_rect, 2)
-        window.blit(font_btn.render(label, True, text_color), font_btn.render(label, True, text_color).get_rect(center=pause_rect.center))
-        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, exit_rect)
-        pygame.draw.rect(window, BLACK if is_dark_mode else WHITE, exit_rect, 2)
-        window.blit(font_btn.render("Exit", True, text_color), font_btn.render("Exit", True, text_color).get_rect(center=exit_rect.center))
+        pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, pause_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, pause_rect, 2)
+        window.blit(font_btn.render(label, True, WHITE if is_dark_mode else BLACK), font_btn.render(label, True, WHITE if is_dark_mode else BLACK).get_rect(center=pause_rect.center))
+        pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, exit_rect)
+        pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, exit_rect, 2)
+        window.blit(font_btn.render("Exit", True, WHITE if is_dark_mode else BLACK), font_btn.render("Exit", True, WHITE if is_dark_mode else BLACK).get_rect(center=exit_rect.center))
         pygame.display.flip()
 
     for move in record.get("moves", []):
