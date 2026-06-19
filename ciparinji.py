@@ -812,50 +812,68 @@ def display_playback_menu(window, records):
     records = sorted(records, key=lambda r: _count_moves_and_redraws(r.get("moves", []))[0] if r.get("moves") else r.get("turns", 999999))
     num = len(records)
     row_h = 32
-    header_h = 44
+    header_h = 52
     margin_left = 14
-    box_w = 420
-    box_h = header_h + num * row_h + 60
+    notebook_margin = 8
+    box_w = 500
+    box_h = header_h + num * row_h + 50
     box_x = 40
-    box_y = 120
+    box_y = 70
     text_color = WHITE if is_dark_mode else BLACK
     paper = (252, 248, 240) if not is_dark_mode else (45, 42, 38)
+    line_color = (200, 190, 180) if not is_dark_mode else (70, 68, 65)
+    red_line = (200, 60, 60) if not is_dark_mode else (180, 80, 80)
 
-    font = pygame.font.Font(None, 22)
-    font_header = pygame.font.Font(None, 24)
+    font = pygame.font.Font(None, 24)
+    font_header = pygame.font.Font(None, 26)
+    font_small = pygame.font.Font(None, 20)
 
     def draw_menu():
         # Draw overlay panel
         pygame.draw.rect(window, paper, (box_x, box_y, box_w, box_h))
         pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, (box_x, box_y, box_w, box_h), 2)
-        header = font_header.render("Playback – click a game to replay", True, text_color)
-        window.blit(header, (box_x + margin_left, box_y + 8))
-        col_hash = box_x + margin_left
-        col_init = box_x + margin_left + 40
-        col_mode = box_x + margin_left + 120
+        # Notebook red thread line on the left
+        pygame.draw.rect(window, red_line, (box_x + notebook_margin, box_y, 3, box_h))
+        # Horizontal lines under each row
+        for r in range(1, num + 1):
+            y = box_y + header_h + r * row_h
+            pygame.draw.line(window, line_color, (box_x + margin_left, y), (box_x + box_w - 10, y), 1)
+        header = font_header.render("Playback", True, text_color)
+        window.blit(header, (box_x + margin_left + 18, box_y + 6))
+        col_hash = box_x + margin_left + 18
+        col_init = box_x + margin_left + 58
+        col_mode = box_x + margin_left + 130
         col_turns = box_x + margin_left + 220
-        head_y = box_y + header_h - 18
-        window.blit(font.render("#", True, text_color), (col_hash, head_y))
-        window.blit(font.render("Initials", True, text_color), (col_init, head_y))
-        window.blit(font.render("Mode", True, text_color), (col_mode, head_y))
-        window.blit(font.render("Turns", True, text_color), (col_turns, head_y))
-        row_rects = []
+        head_y = box_y + 30
+        window.blit(font_small.render("#", True, text_color), (col_hash, head_y))
+        window.blit(font_small.render("Initials", True, text_color), (col_init, head_y))
+        window.blit(font_small.render("Mode", True, text_color), (col_mode, head_y))
+        window.blit(font_small.render("Turns", True, text_color), (col_turns, head_y))
+        replay_rects = []
         for i, rec in enumerate(records):
-            y = box_y + header_h + i * row_h + 4
-            window.blit(font.render(f"{i+1}", True, text_color), (col_hash, y))
+            y = box_y + header_h + i * row_h + 6
+            window.blit(font.render(f"#{i+1}", True, text_color), (col_hash, y))
             window.blit(font.render(rec.get("initials", "---"), True, text_color), (col_init, y))
             window.blit(font.render(rec.get("difficulty", "?"), True, text_color), (col_mode, y))
             window.blit(font.render(str(rec.get("turns", "?")), True, text_color), (col_turns, y))
-            row_rects.append(pygame.Rect(box_x, box_y + header_h + i * row_h, box_w, row_h))
+            btn_w, btn_h = 70, 22
+            btn_x = box_x + box_w - btn_w - 10
+            btn_y = box_y + header_h + i * row_h + (row_h - btn_h) // 2
+            btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+            pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, btn_rect)
+            pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, btn_rect, 2)
+            btn_label = font_small.render("Replay", True, WHITE if is_dark_mode else BLACK)
+            window.blit(btn_label, btn_label.get_rect(center=btn_rect.center))
+            replay_rects.append(btn_rect)
         close_rect = pygame.Rect(box_x + box_w - 90, box_y + box_h - 38, 80, 28)
         pygame.draw.rect(window, BLACK if is_dark_mode else LIGHT_BLUE, close_rect)
         pygame.draw.rect(window, inverted_BLUE if is_dark_mode else BLUE, close_rect, 2)
         close_label = font.render("Close", True, WHITE if is_dark_mode else BLACK)
         window.blit(close_label, close_label.get_rect(center=close_rect.center))
         pygame.display.update()
-        return row_rects, close_rect
+        return replay_rects, close_rect
 
-    row_rects, close_rect = draw_menu()
+    replay_rects, close_rect = draw_menu()
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -864,8 +882,8 @@ def display_playback_menu(window, records):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if close_rect.collidepoint(event.pos):
                     return None
-                for idx, rect in enumerate(row_rects):
-                    if rect.collidepoint(event.pos):
+                for idx, btn_rect in enumerate(replay_rects):
+                    if btn_rect.collidepoint(event.pos):
                         return records[idx]
 
 
